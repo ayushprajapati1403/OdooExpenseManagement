@@ -46,9 +46,9 @@ model Expense {
   id                      String            @id @default(uuid())
   companyId               String
   userId                  String
-  amount                  Decimal           @db.Decimal(18, 2)
+  amount                  Float
   currency                String
-  amountInCompanyCurrency Decimal?          @db.Decimal(18, 2)
+  amountInCompanyCurrency Float?
   category                String
   description             String?
   date                    DateTime

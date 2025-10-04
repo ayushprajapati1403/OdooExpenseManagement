@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Receipt, SquareCheck as CheckSquare, Users, Settings, User, Menu, X, GitBranch, Building2 } from 'lucide-react';
+import { LayoutDashboard, Receipt, SquareCheck as CheckSquare, Settings, User, Menu, X, GitBranch, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -41,11 +41,6 @@ const navItems: NavItem[] = [
     title: 'Company',
     href: '/admin/company',
     icon: <Building2 className="h-5 w-5" />,
-  },
-  {
-    title: 'Users',
-    href: '/users',
-    icon: <Users className="h-5 w-5" />,
   },
   {
     title: 'Profile',

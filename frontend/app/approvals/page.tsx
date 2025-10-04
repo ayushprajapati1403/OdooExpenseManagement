@@ -11,6 +11,7 @@ import { NotebookContainer } from '@/components/layout/notebook-container';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { apiClient } from '@/lib/supabase';
 import type {
   ApprovalRequest,
   ApprovalActionRecord,
@@ -29,148 +30,59 @@ function ApprovalsPage() {
   const { toast } = useToast();
 
   React.useEffect(() => {
-    const mockExpense: Expense = {
-      id: '1',
-      title: 'Team Lunch at Cafe Rouge',
-      amount: 250.0,
-      currency: 'USD' as const,
-      category: 'food',
-      date: new Date().toISOString().split('T')[0],
-      description: 'Monthly team building lunch with the engineering team',
-      status: 'pending',
-      lineItems: [
-        {
-          id: '1',
-          description: 'Main courses',
-          amount: 180.0,
-          category: 'food',
-        },
-        {
-          id: '2',
-          description: 'Beverages',
-          amount: 70.0,
-          category: 'food',
-        },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    const mockApprovals: ApprovalRequest[] = [
-      {
-        id: '1',
-        expenseId: '1',
-        flowId: 'flow-1',
-        currentStep: 1,
-        status: 'pending',
-        expense: mockExpense,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        expenseId: '2',
-        flowId: 'flow-1',
-        currentStep: 2,
-        status: 'pending',
-        expense: {
-          ...mockExpense,
-          id: '2',
-          title: 'Office Supplies Purchase',
-          amount: 150.0,
-          category: 'shopping',
-          description: 'Printer paper, pens, and notebooks for the team',
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      {
-        id: '3',
-        expenseId: '3',
-        flowId: 'flow-1',
-        currentStep: 3,
-        status: 'approved',
-        expense: {
-          ...mockExpense,
-          id: '3',
-          title: 'Conference Registration',
-          amount: 500.0,
-          category: 'education',
-          description: 'Annual tech conference registration fee',
-        },
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-        updatedAt: new Date(Date.now() - 86400000).toISOString(),
-      },
-    ];
-
-    setApprovals(mockApprovals);
+    loadApprovals();
   }, []);
+
+  const loadApprovals = async () => {
+    try {
+      const response = await apiClient.getPendingApprovals();
+      setApprovals(response.approvals || []);
+    } catch (error) {
+      console.error('Failed to load approvals:', error);
+    }
+  };
 
   const handleApprove = async (id: string, comment?: string) => {
     setIsProcessing(true);
-
-    setTimeout(() => {
-      const newAction: ApprovalActionRecord = {
-        id: Math.random().toString(36).substr(2, 9),
-        requestId: id,
-        stepId: 'step-1',
-        approverId: 'user-1',
-        action: 'approved',
-        comment: comment || '',
-        approverName: 'Current User',
-        stepName: 'Manager Approval',
-        createdAt: new Date().toISOString(),
-      };
-
-      setActions((prev) => [...prev, newAction]);
-      setApprovals((prev) =>
-        prev.map((approval) =>
-          approval.id === id ? { ...approval, status: 'approved' as const } : approval
-        )
-      );
-
+    try {
+      await apiClient.approveExpense(id, comment);
       toast({
         title: 'Expense Approved',
         description: 'The expense has been approved successfully.',
       });
-
+      await loadApprovals(); // Reload approvals
       setSelectedApproval(null);
+    } catch (error: any) {
+      toast({
+        title: 'Approval Failed',
+        description: error.message || 'Failed to approve expense.',
+        variant: 'destructive',
+      });
+    } finally {
       setIsProcessing(false);
-    }, 1000);
+    }
   };
 
   const handleReject = async (id: string, comment?: string) => {
     setIsProcessing(true);
-
-    setTimeout(() => {
-      const newAction: ApprovalActionRecord = {
-        id: Math.random().toString(36).substr(2, 9),
-        requestId: id,
-        stepId: 'step-1',
-        approverId: 'user-1',
-        action: 'rejected',
-        comment: comment || '',
-        approverName: 'Current User',
-        stepName: 'Manager Approval',
-        createdAt: new Date().toISOString(),
-      };
-
-      setActions((prev) => [...prev, newAction]);
-      setApprovals((prev) =>
-        prev.map((approval) =>
-          approval.id === id ? { ...approval, status: 'rejected' as const } : approval
-        )
-      );
-
+    try {
+      await apiClient.rejectExpense(id, comment);
       toast({
         title: 'Expense Rejected',
         description: 'The expense has been rejected.',
         variant: 'destructive',
       });
-
+      await loadApprovals(); // Reload approvals
       setSelectedApproval(null);
+    } catch (error: any) {
+      toast({
+        title: 'Rejection Failed',
+        description: error.message || 'Failed to reject expense.',
+        variant: 'destructive',
+      });
+    } finally {
       setIsProcessing(false);
-    }, 1000);
+    }
   };
 
   const handleViewDetails = (id: string) => {

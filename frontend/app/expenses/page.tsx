@@ -8,28 +8,58 @@ import { ExpenseCard } from '@/components/expense/expense-card';
 import { ExpenseSummary } from '@/components/expense/expense-summary';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { NotebookContainer } from '@/components/layout/notebook-container';
+import { apiClient } from '@/lib/supabase';
 import type { Expense } from '@/types';
 import type { ExpenseFormValues } from '@/lib/validations';
 
 function ExpensesPage() {
   const [expenses, setExpenses] = React.useState<Expense[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
 
-  const handleAddExpense = (data: ExpenseFormValues) => {
-    const newExpense: Expense = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...data,
-      currency: data.currency || 'USD',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+  React.useEffect(() => {
+    loadExpenses();
+  }, []);
 
-    setExpenses((prev) => [newExpense, ...prev]);
+  const loadExpenses = async () => {
+    try {
+      setIsLoading(true);
+      const response = await apiClient.getExpenses();
+      setExpenses(response.expenses || []);
+    } catch (error) {
+      console.error('Failed to load expenses:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDeleteExpense = (id: string) => {
-    setExpenses((prev) => prev.filter((expense) => expense.id !== id));
+  const handleAddExpense = async (data: ExpenseFormValues) => {
+    try {
+      setIsLoading(true);
+      const expenseData = {
+        amount: data.amount,
+        currency: data.currency || 'USD',
+        category: data.category,
+        description: data.description,
+        date: data.date,
+        expenseLines: data.lineItems || []
+      };
+      
+      const response = await apiClient.createExpense(expenseData);
+      setExpenses((prev) => [response.expense, ...prev]);
+    } catch (error) {
+      console.error('Failed to create expense:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      await apiClient.deleteExpense(id);
+      setExpenses((prev) => prev.filter((expense) => expense.id !== id));
+    } catch (error) {
+      console.error('Failed to delete expense:', error);
+    }
   };
 
   const summary = React.useMemo(() => {

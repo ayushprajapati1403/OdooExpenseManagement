@@ -33,7 +33,7 @@ export function WelcomeBanner() {
               >
                 <Sparkles className="h-5 w-5 text-yellow-500" />
                 <h2 className="text-2xl font-bold handwriting-text">
-                  {getGreeting()}, {user?.fullName?.split(' ')[0] || 'there'}!
+                  {getGreeting()}, {user?.name?.split(' ')[0] || 'there'}!
                 </h2>
               </motion.div>
               <motion.p

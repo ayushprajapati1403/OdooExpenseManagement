@@ -80,12 +80,12 @@ export default function SignupPage() {
     setIsLoading(true);
     try {
       const response = await signUp({
+        name: data.fullName,
         email: data.email,
         password: data.password,
-        fullName: data.fullName,
+        role: 'ADMIN',
         companyName: data.companyName,
-        role: data.role,
-        country: data.country,
+        companyCountry: data.country,
       });
       setUser(response.user);
       toast({

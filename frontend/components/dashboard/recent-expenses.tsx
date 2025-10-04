@@ -77,7 +77,7 @@ export function RecentExpenses({ expenses }: RecentExpensesProps) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-lg">${expense.amount.toFixed(2)}</p>
+                    <p className="font-bold text-lg">${Number(expense.amount || 0).toFixed(2)}</p>
                     <Badge variant="secondary" className="text-xs capitalize">
                       {expense.category}
                     </Badge>

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { User, Mail, Phone, Building, MapPin, Briefcase, FileText, Save } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
@@ -13,26 +14,64 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { apiClient } from '@/lib/supabase';
 import type { UserProfile } from '@/types';
+import type { AuthUser } from '@/lib/supabase';
 
 function ProfilePage() {
   const [profile, setProfile] = React.useState<UserProfile>({
-    id: '1',
-    email: 'john.doe@company.com',
-    fullName: 'John Doe',
-    phone: '+1 (555) 123-4567',
-    department: 'Engineering',
-    position: 'Senior Software Engineer',
-    location: 'San Francisco, CA',
-    bio: 'Passionate about building great products and leading innovative teams.',
+    id: '',
+    email: '',
+    fullName: '',
+    phone: '',
+    department: '',
+    position: '',
+    location: '',
+    bio: '',
     avatarUrl: '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
 
+  const [isLoading, setIsLoading] = React.useState(true);
   const [isUploading, setIsUploading] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setIsLoading(true);
+      const userData = await apiClient.getUserProfile();
+      
+      // Convert AuthUser to UserProfile format
+      setProfile({
+        id: userData.id,
+        email: userData.email,
+        fullName: userData.name,
+        phone: '',
+        department: '',
+        position: '',
+        location: '',
+        bio: '',
+        avatarUrl: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Failed to load profile:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load profile information',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAvatarUpload = async (file: File) => {
     setIsUploading(true);
@@ -64,11 +103,12 @@ function ProfilePage() {
   const handleSave = async () => {
     setIsSaving(true);
 
+    // Note: Profile update endpoint not yet implemented in backend
     setTimeout(() => {
       setIsSaving(false);
       toast({
-        title: 'Success',
-        description: 'Profile updated successfully',
+        title: 'Info',
+        description: 'Profile updates are not yet available. Contact your administrator to update your profile.',
       });
     }, 1000);
   };
@@ -98,7 +138,15 @@ function ProfilePage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {isLoading ? (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading profile...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -256,15 +304,30 @@ function ProfilePage() {
             </NotebookContainer>
           </motion.div>
         </div>
+        )}
       </motion.div>
     </DashboardLayout>
   );
 }
 
+const DynamicProfilePage = dynamic(() => Promise.resolve(ProfilePage), {
+  ssr: false,
+  loading: () => (
+    <DashboardLayout>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    </DashboardLayout>
+  )
+});
+
 export default function Profile() {
   return (
     <ProtectedRoute>
-      <ProfilePage />
+      <DynamicProfilePage />
     </ProtectedRoute>
   );
 }

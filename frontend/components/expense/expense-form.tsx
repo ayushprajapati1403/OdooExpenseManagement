@@ -4,7 +4,7 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -37,6 +37,8 @@ import type { ExpenseCategory } from '@/types';
 interface ExpenseFormProps {
   onSubmit: (data: ExpenseFormValues) => void;
   isLoading?: boolean;
+  open?: boolean;
+  onClose?: () => void;
 }
 
 const categories: { value: ExpenseCategory; label: string }[] = [
@@ -50,8 +52,12 @@ const categories: { value: ExpenseCategory; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export function ExpenseForm({ onSubmit, isLoading }: ExpenseFormProps) {
-  const [open, setOpen] = React.useState(false);
+export function ExpenseForm({ onSubmit, isLoading, open, onClose }: ExpenseFormProps) {
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  
+  // Use external open state if provided, otherwise use internal state
+  const isOpen = open !== undefined ? open : internalOpen;
+  const setIsOpen = onClose || setInternalOpen;
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
@@ -67,11 +73,16 @@ export function ExpenseForm({ onSubmit, isLoading }: ExpenseFormProps) {
   const handleSubmit = (data: ExpenseFormValues) => {
     onSubmit(data);
     form.reset();
-    setOpen(false);
+    setIsOpen(false);
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+    form.reset();
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
           <Button size="lg" className="w-full md:w-auto">
@@ -82,10 +93,22 @@ export function ExpenseForm({ onSubmit, isLoading }: ExpenseFormProps) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add New Expense</DialogTitle>
-          <DialogDescription>
-            Record a new expense in your notebook. Fill in the details below.
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle>Add New Expense</DialogTitle>
+              <DialogDescription>
+                Record a new expense in your notebook. Fill in the details below.
+              </DialogDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="h-6 w-6"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -186,7 +209,7 @@ export function ExpenseForm({ onSubmit, isLoading }: ExpenseFormProps) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={handleClose}
                 className="flex-1"
               >
                 Cancel

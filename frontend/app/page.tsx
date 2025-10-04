@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import dynamic from 'next/dynamic';
 import { DollarSign, TrendingUp, Receipt, Clock } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { WelcomeBanner } from '@/components/dashboard/welcome-banner';
@@ -10,36 +11,66 @@ import { RecentExpenses } from '@/components/dashboard/recent-expenses';
 import { ExpenseForm } from '@/components/expense/expense-form';
 import { SkeletonCard, SkeletonList } from '@/components/dashboard/skeleton-card';
 import { ProtectedRoute } from '@/components/auth/protected-route';
+import { apiClient } from '@/lib/supabase';
 import type { Expense } from '@/types';
 import type { ExpenseFormValues } from '@/lib/validations';
 
 function HomePage() {
   const [expenses, setExpenses] = React.useState<Expense[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [showExpenseForm, setShowExpenseForm] = React.useState(false);
 
-  const handleAddExpense = (data: ExpenseFormValues) => {
-    const newExpense: Expense = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...data,
-      currency: data.currency || 'USD',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+  React.useEffect(() => {
+    loadExpenses();
+  }, []);
 
-    setExpenses((prev) => [newExpense, ...prev]);
-    setShowExpenseForm(false);
+  const loadExpenses = async () => {
+    try {
+      setIsLoading(true);
+      const response = await apiClient.getExpenses();
+      setExpenses(response.expenses || []);
+    } catch (error) {
+      console.error('Failed to load expenses:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddExpense = async (data: ExpenseFormValues) => {
+    try {
+      setIsLoading(true);
+      const expenseData = {
+        amount: data.amount,
+        currency: data.currency || 'USD',
+        category: data.category,
+        description: data.description,
+        date: data.date,
+        expenseLines: data.lineItems || []
+      };
+      
+      const response = await apiClient.createExpense(expenseData);
+      setExpenses((prev) => [response.expense, ...prev]);
+      setShowExpenseForm(false);
+    } catch (error) {
+      console.error('Failed to create expense:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const stats = React.useMemo(() => {
-    const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const total = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
     const count = expenses.length;
     const average = count > 0 ? total / count : 0;
     const lastMonthTotal = total * 0.85;
     const change = lastMonthTotal > 0 ? ((total - lastMonthTotal) / lastMonthTotal) * 100 : 0;
 
-    return { total, count, average, change };
+    return { 
+      total: Number(total) || 0, 
+      count: Number(count) || 0, 
+      average: Number(average) || 0, 
+      change: Number(change) || 0 
+    };
   }, [expenses]);
 
   return (
@@ -106,6 +137,8 @@ function HomePage() {
             <ExpenseForm
               onSubmit={handleAddExpense}
               isLoading={isLoading}
+              open={showExpenseForm}
+              onClose={() => setShowExpenseForm(false)}
             />
           </div>
         </div>
@@ -114,10 +147,26 @@ function HomePage() {
   );
 }
 
+const DynamicHomePage = dynamic(() => Promise.resolve(HomePage), {
+  ssr: false,
+  loading: () => (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      </div>
+    </DashboardLayout>
+  )
+});
+
 export default function Home() {
   return (
     <ProtectedRoute>
-      <HomePage />
+      <DynamicHomePage />
     </ProtectedRoute>
   );
 }

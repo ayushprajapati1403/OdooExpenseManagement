@@ -1,12 +1,12 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export interface AuthUser {
   id: string;
+  name: string;
   email: string;
-  fullName?: string;
-  companyName?: string;
-  role?: string;
-  country?: string;
+  role: string;
+  companyId: string;
+  isManagerApprover?: boolean;
 }
 
 export interface AuthResponse {
@@ -15,12 +15,12 @@ export interface AuthResponse {
 }
 
 export interface SignUpData {
+  name: string;
   email: string;
   password: string;
-  fullName: string;
-  companyName: string;
   role: string;
-  country: string;
+  companyName: string;
+  companyCountry: string;
 }
 
 class ApiClient {
@@ -29,7 +29,15 @@ class ApiClient {
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
-    this.token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    // Only access localStorage on the client side
+    if (typeof window !== 'undefined') {
+      try {
+        this.token = localStorage.getItem('auth_token');
+      } catch (error) {
+        console.warn('Failed to access localStorage:', error);
+        this.token = null;
+      }
+    }
   }
 
   private async request<T>(
@@ -37,62 +45,95 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string>),
     };
 
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'An error occurred' }));
-      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText || 'An error occurred' };
+        }
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Network error occurred');
     }
-
-    return response.json();
   }
 
   setToken(token: string | null) {
     this.token = token;
     if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('auth_token', token);
-      } else {
-        localStorage.removeItem('auth_token');
+      try {
+        if (token) {
+          localStorage.setItem('auth_token', token);
+        } else {
+          localStorage.removeItem('auth_token');
+        }
+      } catch (error) {
+        console.warn('Failed to access localStorage:', error);
       }
     }
   }
 
   async signUp(data: SignUpData): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/api/auth/signup', {
+    const response = await this.request<{
+      message: string;
+      user: AuthUser;
+      company: any;
+      token: string;
+    }>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
     });
     
     this.setToken(response.token);
-    return response;
+    return {
+      user: response.user,
+      token: response.token
+    };
   }
 
   async signIn(email: string, password: string): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/api/auth/login', {
+    const response = await this.request<{
+      message: string;
+      user: AuthUser;
+      token: string;
+    }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
     
     this.setToken(response.token);
-    return response;
+    return {
+      user: response.user,
+      token: response.token
+    };
   }
 
   async signOut(): Promise<void> {
     try {
-      await this.request('/api/auth/logout', {
+      await this.request('/auth/logout', {
         method: 'POST',
       });
     } catch (error) {
@@ -103,10 +144,13 @@ class ApiClient {
   }
 
   async getCurrentUser(): Promise<AuthUser | null> {
+    // Only run on client side
+    if (typeof window === 'undefined') return null;
+    
     if (!this.token) return null;
 
     try {
-      const response = await this.request<{ user: AuthUser }>('/api/auth/me');
+      const response = await this.request<{ user: AuthUser }>('/auth/profile');
       return response.user;
     } catch (error) {
       this.setToken(null);
@@ -114,13 +158,169 @@ class ApiClient {
     }
   }
 
+  async getUserProfile(): Promise<AuthUser> {
+    const response = await this.request<{ user: AuthUser }>('/auth/profile');
+    return response.user;
+  }
+
   async refreshToken(): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/api/auth/refresh', {
+    const response = await this.request<{
+      message: string;
+      user: AuthUser;
+      token: string;
+    }>('/auth/refresh', {
       method: 'POST',
     });
     
     this.setToken(response.token);
+    return {
+      user: response.user,
+      token: response.token
+    };
+  }
+
+  // Expense Management
+  async getExpenses(page = 1, limit = 10) {
+    const response = await this.request<{
+      expenses: any[];
+      pagination: any;
+    }>(`/expenses/my-expenses?page=${page}&limit=${limit}`);
+    
+    // Ensure amount is converted to number
+    response.expenses = response.expenses.map(expense => ({
+      ...expense,
+      amount: Number(expense.amount) || 0
+    }));
+    
     return response;
+  }
+
+  async createExpense(expenseData: any) {
+    const response = await this.request<{
+      message: string;
+      expense: any;
+    }>('/expenses', {
+      method: 'POST',
+      body: JSON.stringify(expenseData),
+    });
+    
+    // Ensure amount is converted to number
+    response.expense.amount = Number(response.expense.amount) || 0;
+    
+    return response;
+  }
+
+  async updateExpense(expenseId: string, expenseData: any) {
+    return this.request<{
+      message: string;
+      expense: any;
+    }>(`/expenses/${expenseId}`, {
+      method: 'PUT',
+      body: JSON.stringify(expenseData),
+    });
+  }
+
+  async deleteExpense(expenseId: string) {
+    return this.request<{
+      message: string;
+    }>(`/expenses/${expenseId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Approval Management
+  async getPendingApprovals(page = 1, limit = 10) {
+    return this.request<{
+      approvals: any[];
+      pagination: any;
+    }>(`/flows/pending?page=${page}&limit=${limit}`);
+  }
+
+  async approveExpense(requestId: string, comment?: string) {
+    return this.request<{
+      message: string;
+    }>(`/flows/${requestId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ comment }),
+    });
+  }
+
+  async rejectExpense(requestId: string, comment?: string) {
+    return this.request<{
+      message: string;
+    }>(`/flows/${requestId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ comment }),
+    });
+  }
+
+  // Company Management
+  async getCompanyStatistics() {
+    return this.request<{
+      statistics: any;
+    }>('/company/statistics');
+  }
+
+  async getCompanyUsers() {
+    return this.request<{
+      users: any[];
+    }>('/company/users');
+  }
+
+  // Approval Flows
+  async getApprovalFlows() {
+    return this.request<{
+      approvalFlows: any[];
+    }>('/flows/approval-flows');
+  }
+
+  async createApprovalFlow(flowData: any) {
+    return this.request<{
+      message: string;
+      approvalFlow: any;
+    }>('/flows/approval-flows', {
+      method: 'POST',
+      body: JSON.stringify(flowData),
+    });
+  }
+
+  // OCR Processing
+  async processReceipt(file: File) {
+    const formData = new FormData();
+    formData.append('receipt', file);
+    
+    return this.request<{
+      message: string;
+      ocrData: {
+        totalAmount: number;
+        currency: string;
+        merchant: string;
+        date: string;
+        items: Array<{
+          description: string;
+          amount: number;
+        }>;
+        confidence: number;
+      };
+    }>('/ocr/process-receipt', {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Remove Content-Type header for FormData
+    });
+  }
+
+  async createExpenseFromReceipt(file: File) {
+    const formData = new FormData();
+    formData.append('receipt', file);
+    
+    return this.request<{
+      message: string;
+      expense: any;
+    }>('/ocr/create-expense', {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Remove Content-Type header for FormData
+    });
   }
 }
 
