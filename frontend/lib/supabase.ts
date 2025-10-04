@@ -173,7 +173,7 @@ class ApiClient {
     });
     
     this.setToken(response.token);
-    return {
+  return {
       user: response.user,
       token: response.token
     };
@@ -265,6 +265,31 @@ class ApiClient {
     return this.request<{
       users: any[];
     }>('/company/users');
+  }
+
+  async getCompanyStats() {
+    return this.request<{
+      statistics: {
+        totalUsers: number;
+        totalExpenses: number;
+        pendingExpenses: number;
+        approvedExpenses: number;
+        rejectedExpenses: number;
+        totalApprovalFlows: number;
+        monthlyExpenseTrend: Array<{
+          month: string;
+          count: number;
+          amount: number;
+        }>;
+      };
+    }>('/company/statistics');
+  }
+
+  async getCompanyExpenses(page = 1, limit = 10) {
+    return this.request<{
+      expenses: any[];
+      pagination: any;
+    }>(`/company/expenses?page=${page}&limit=${limit}`);
   }
 
   // Approval Flows

@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { apiClient } from '@/lib/supabase';
 import type { CompanySettings, Currency } from '@/types';
 
 function CompanySettingsPage() {
@@ -41,11 +42,14 @@ function CompanySettingsPage() {
     address: '123 Main St, Suite 100',
     country: 'United States',
     timezone: 'America/Los_Angeles',
-    fiscalYearStart: '01-01',
+    fiscalYearStart: '2024-01-01', // Fixed date format
     updatedAt: new Date().toISOString(),
   });
 
+  const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [companyStats, setCompanyStats] = React.useState<any>(null);
+  const [userRole, setUserRole] = React.useState<string>('');
   const { toast } = useToast();
 
   const currencies: { value: Currency; label: string; symbol: string }[] = [
@@ -56,6 +60,47 @@ function CompanySettingsPage() {
     { value: 'CAD', label: 'Canadian Dollar', symbol: 'CA$' },
     { value: 'AUD', label: 'Australian Dollar', symbol: 'A$' },
   ];
+
+  React.useEffect(() => {
+    loadCompanyData();
+  }, []);
+
+  const loadCompanyData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Load user profile to get company info
+      const userProfile = await apiClient.getUserProfile();
+      setUserRole(userProfile.role);
+      
+      // Only load company statistics if user is admin
+      if (userProfile.role === 'ADMIN') {
+        try {
+          const statsResponse = await apiClient.getCompanyStats();
+          setCompanyStats(statsResponse.statistics);
+        } catch (error) {
+          console.warn('Failed to load company statistics (admin only):', error);
+          // Don't show error for non-admin users
+        }
+      }
+      
+      setSettings(prev => ({
+        ...prev,
+        id: userProfile.companyId || '',
+        // Note: Company name and other details not available in current backend
+        // These would need to be added to the Company model
+      }));
+    } catch (error) {
+      console.error('Failed to load company data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load company information',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const companySizes = [
     { value: '1-10', label: '1-10 employees' },
@@ -69,11 +114,12 @@ function CompanySettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
 
+    // Note: Company settings update not yet implemented in backend
     setTimeout(() => {
       setIsSaving(false);
       toast({
-        title: 'Success',
-        description: 'Company settings updated successfully',
+        title: 'Info',
+        description: 'Company settings update is not yet available. The backend needs additional company fields to be implemented.',
       });
     }, 1000);
   };
@@ -104,15 +150,82 @@ function CompanySettingsPage() {
             </p>
           </div>
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button size="lg" onClick={handleSave} disabled={isSaving}>
+            <Button size="lg" onClick={handleSave} disabled={isSaving || isLoading}>
               <Save className="h-5 w-5 mr-2" />
               {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
           </motion.div>
         </div>
 
-        <NotebookContainer animate={false}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* User Role Indicator */}
+        {userRole && (
+          <div className="mb-6 p-4 bg-accent/50 rounded-lg border-l-4 border-primary">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-primary rounded-full"></div>
+              <span className="text-sm font-medium">
+                Current Role: <span className="text-primary">{userRole}</span>
+                {userRole !== 'ADMIN' && (
+                  <span className="text-muted-foreground ml-2">
+                    (Company statistics require admin access)
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading company information...</p>
+            </div>
+          </div>
+        ) : (
+          <NotebookContainer animate={false}>
+            {/* Company Statistics */}
+            {companyStats && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="mb-6"
+              >
+                <Card className="notebook-shadow">
+                  <CardHeader>
+                    <CardTitle className="handwriting-text text-xl flex items-center gap-2">
+                      <Building2 className="h-5 w-5" />
+                      Company Statistics
+                    </CardTitle>
+                    <CardDescription>
+                      Overview of your company's expense management activity
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center p-4 bg-accent/50 rounded-lg">
+                        <div className="text-2xl font-bold text-primary">{companyStats.totalUsers}</div>
+                        <div className="text-sm text-muted-foreground">Total Users</div>
+                      </div>
+                      <div className="text-center p-4 bg-accent/50 rounded-lg">
+                        <div className="text-2xl font-bold text-primary">{companyStats.totalExpenses}</div>
+                        <div className="text-sm text-muted-foreground">Total Expenses</div>
+                      </div>
+                      <div className="text-center p-4 bg-accent/50 rounded-lg">
+                        <div className="text-2xl font-bold text-orange-600">{companyStats.pendingExpenses}</div>
+                        <div className="text-sm text-muted-foreground">Pending</div>
+                      </div>
+                      <div className="text-center p-4 bg-accent/50 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600">{companyStats.approvedExpenses}</div>
+                        <div className="text-sm text-muted-foreground">Approved</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -328,6 +441,7 @@ function CompanySettingsPage() {
             </motion.div>
           </div>
         </NotebookContainer>
+        )}
       </motion.div>
     </DashboardLayout>
   );
