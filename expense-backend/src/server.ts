@@ -6,11 +6,13 @@ import prisma from './prisma.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import expenseRoutes from './routes/expenses.js';
+import flowRoutes from './routes/flows.js';
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/flows', flowRoutes);
 
 const PORT = config.port;
 

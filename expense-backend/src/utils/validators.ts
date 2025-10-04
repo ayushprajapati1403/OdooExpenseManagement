@@ -177,3 +177,62 @@ export const validateExpenseUpdate = (req: Request, res: Response, next: NextFun
 
   next();
 };
+
+export const validateApprovalFlow = (req: Request, res: Response, next: NextFunction) => {
+  const { name, ruleType, percentageThreshold, specificApproverId, steps } = req.body;
+  const errors: string[] = [];
+
+  if (!name) errors.push('Name is required');
+  else if (name.trim().length < 2) errors.push('Name must be at least 2 characters');
+
+  if (!steps || !Array.isArray(steps) || steps.length === 0) {
+    errors.push('Steps array is required and must not be empty');
+  } else {
+    steps.forEach((step: any, index: number) => {
+      if (!step.role && !step.specificUserId) {
+        errors.push(`Step ${index + 1}: Either role or specificUserId is required`);
+      }
+      if (step.role && !['ADMIN', 'MANAGER', 'EMPLOYEE', 'FINANCE', 'DIRECTOR'].includes(step.role)) {
+        errors.push(`Step ${index + 1}: Invalid role`);
+      }
+    });
+  }
+
+  if (ruleType && !['UNANIMOUS', 'PERCENTAGE', 'SPECIFIC', 'HYBRID'].includes(ruleType)) {
+    errors.push('Rule type must be one of: UNANIMOUS, PERCENTAGE, SPECIFIC, HYBRID');
+  }
+
+  if (ruleType === 'PERCENTAGE' && (!percentageThreshold || percentageThreshold < 1 || percentageThreshold > 100)) {
+    errors.push('Percentage threshold must be between 1 and 100 for PERCENTAGE rule type');
+  }
+
+  if (ruleType === 'SPECIFIC' && !specificApproverId) {
+    errors.push('Specific approver ID is required for SPECIFIC rule type');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({ error: 'Validation failed', details: errors });
+  }
+
+  next();
+};
+
+export const validateApprovalAction = (req: Request, res: Response, next: NextFunction) => {
+  const { action, comment } = req.body;
+  const errors: string[] = [];
+
+  if (!action) errors.push('Action is required');
+  else if (!['approve', 'reject'].includes(action)) {
+    errors.push('Action must be either approve or reject');
+  }
+
+  if (comment && typeof comment !== 'string') {
+    errors.push('Comment must be a string');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({ error: 'Validation failed', details: errors });
+  }
+
+  next();
+};
