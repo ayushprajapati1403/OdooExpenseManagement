@@ -96,7 +96,7 @@ export const validateManagerAssignment = (req: Request, res: Response, next: Nex
 };
 
 export const validateExpense = (req: Request, res: Response, next: NextFunction) => {
-  const { amount, currency, category, date } = req.body;
+  const { amount, currency, category, date, expenseLines } = req.body;
   const errors: string[] = [];
 
   if (!amount) errors.push('Amount is required');
@@ -106,9 +106,70 @@ export const validateExpense = (req: Request, res: Response, next: NextFunction)
   else if (currency.length !== 3) errors.push('Currency must be a 3-letter code');
 
   if (!category) errors.push('Category is required');
+  else if (category.trim().length < 2) errors.push('Category must be at least 2 characters');
 
   if (!date) errors.push('Date is required');
   else if (isNaN(Date.parse(date))) errors.push('Invalid date format');
+
+  // Validate expense lines if provided
+  if (expenseLines && Array.isArray(expenseLines)) {
+    expenseLines.forEach((line: any, index: number) => {
+      if (!line.amount || isNaN(parseFloat(line.amount)) || parseFloat(line.amount) <= 0) {
+        errors.push(`Expense line ${index + 1}: Amount must be a positive number`);
+      }
+      if (!line.description || line.description.trim().length === 0) {
+        errors.push(`Expense line ${index + 1}: Description is required`);
+      }
+    });
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({ error: 'Validation failed', details: errors });
+  }
+
+  next();
+};
+
+export const validateExpenseUpdate = (req: Request, res: Response, next: NextFunction) => {
+  const { amount, currency, category, date, expenseLines } = req.body;
+  const errors: string[] = [];
+
+  // Only validate provided fields
+  if (amount !== undefined) {
+    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+      errors.push('Amount must be a positive number');
+    }
+  }
+
+  if (currency !== undefined) {
+    if (currency.length !== 3) {
+      errors.push('Currency must be a 3-letter code');
+    }
+  }
+
+  if (category !== undefined) {
+    if (category.trim().length < 2) {
+      errors.push('Category must be at least 2 characters');
+    }
+  }
+
+  if (date !== undefined) {
+    if (isNaN(Date.parse(date))) {
+      errors.push('Invalid date format');
+    }
+  }
+
+  // Validate expense lines if provided
+  if (expenseLines && Array.isArray(expenseLines)) {
+    expenseLines.forEach((line: any, index: number) => {
+      if (!line.amount || isNaN(parseFloat(line.amount)) || parseFloat(line.amount) <= 0) {
+        errors.push(`Expense line ${index + 1}: Amount must be a positive number`);
+      }
+      if (!line.description || line.description.trim().length === 0) {
+        errors.push(`Expense line ${index + 1}: Description is required`);
+      }
+    });
+  }
 
   if (errors.length > 0) {
     return res.status(400).json({ error: 'Validation failed', details: errors });

@@ -5,10 +5,12 @@ import prisma from './prisma.js';
 // Import routes
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
+import expenseRoutes from './routes/expenses.js';
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 const PORT = config.port;
 
