@@ -35,6 +35,14 @@ export function ApprovalTimeline({
   currentStep,
   totalSteps,
 }: ApprovalTimelineProps) {
+  // Debug logging
+  console.log('🔍 ApprovalTimeline data:', {
+    actionsCount: actions.length,
+    actions: actions,
+    currentStep,
+    totalSteps
+  });
+
   const getInitials = (name: string) => {
     return name
       .split(' ')

@@ -12,16 +12,32 @@ export class OCRController {
 
   async processReceipt(req: AuthenticatedRequest, res: Response) {
     try {
+      console.log('🔧 OCR Controller: Processing receipt request');
+      
       if (!req.file) {
+        console.log('❌ OCR Controller: No file received');
         return res.status(400).json({ error: 'Receipt image is required' });
       }
+
+      console.log('✅ OCR Controller: File received:', {
+        filename: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      });
 
       const { category, description, date } = req.body;
 
       // Process receipt with OCR service
+      console.log('🔧 OCR Controller: Calling OCR service');
       const ocrResult = await this.ocrService.processReceipt(req.file.buffer, req.file.originalname);
+      console.log('🔧 OCR Controller: OCR result:', {
+        success: ocrResult.success,
+        confidence: ocrResult.confidence,
+        hasRawData: !!ocrResult.rawData
+      });
 
       if (!ocrResult.success) {
+        console.log('❌ OCR Controller: OCR processing failed');
         return res.status(400).json({ 
           error: 'Failed to process receipt',
           details: ocrResult.rawData?.error || 'OCR processing failed'
@@ -30,9 +46,13 @@ export class OCRController {
 
       // Validate extracted data
       const receiptData = ocrResult.rawData as any;
+      console.log('🔧 OCR Controller: Raw receipt data:', receiptData);
+      
       const validation = this.ocrService.validateReceiptData(receiptData);
+      console.log('🔧 OCR Controller: Validation result:', validation);
 
       if (!validation.isValid) {
+        console.log('❌ OCR Controller: Validation failed:', validation.errors);
         return res.status(400).json({
           error: 'Invalid receipt data',
           details: validation.errors
@@ -41,29 +61,22 @@ export class OCRController {
 
       // Extract expense data
       const expenseData = this.ocrService.extractExpenseData(ocrResult);
+      console.log('🔧 OCR Controller: Extracted expense data:', expenseData);
 
-      res.json({
+      const response = {
         message: 'Receipt processed successfully',
-        ocrResult: {
-          success: ocrResult.success,
-          confidence: ocrResult.confidence,
-          extractedData: {
-            merchant: receiptData.merchant,
-            totalAmount: receiptData.totalAmount,
-            currency: receiptData.currency,
-            date: receiptData.date,
-            items: receiptData.items
-          },
-          expenseData: {
-            amount: expenseData.amount,
-            currency: expenseData.currency,
-            category: expenseData.category,
-            description: expenseData.description,
-            date: expenseData.date,
-            expenseLines: expenseData.expenseLines
-          }
+        ocrData: {
+          totalAmount: receiptData.totalAmount,
+          currency: receiptData.currency,
+          merchant: receiptData.merchant,
+          date: receiptData.date,
+          items: receiptData.items,
+          confidence: ocrResult.confidence
         }
-      });
+      };
+      
+      console.log('✅ OCR Controller: Sending response:', response);
+      res.json(response);
     } catch (error) {
       console.error('Process receipt error:', error);
       res.status(500).json({ error: 'Internal server error' });

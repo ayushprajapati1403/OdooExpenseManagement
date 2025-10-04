@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { apiClient } from '@/lib/supabase';
+import { apiClient } from '@/lib/prisma';
 import type { CompanySettings, Currency } from '@/types';
 
 function CompanySettingsPage() {

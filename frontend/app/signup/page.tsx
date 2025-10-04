@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { signupFormSchema, type SignupFormValues } from '@/lib/validations';
-import { signUp } from '@/lib/supabase';
+import { signUp } from '@/lib/prisma';
 import { PasswordStrength } from '@/components/auth/password-strength';
 import { useAuth } from '@/contexts/auth-context';
 

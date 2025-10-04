@@ -14,9 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { apiClient } from '@/lib/supabase';
+import { apiClient } from '@/lib/prisma';
 import type { UserProfile } from '@/types';
-import type { AuthUser } from '@/lib/supabase';
+import type { AuthUser } from '@/lib/prisma';
 
 function ProfilePage() {
   const [profile, setProfile] = React.useState<UserProfile>({

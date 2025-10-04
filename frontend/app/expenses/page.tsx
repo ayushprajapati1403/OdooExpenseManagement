@@ -8,7 +8,7 @@ import { ExpenseCard } from '@/components/expense/expense-card';
 import { ExpenseSummary } from '@/components/expense/expense-summary';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { NotebookContainer } from '@/components/layout/notebook-container';
-import { apiClient } from '@/lib/supabase';
+import { apiClient } from '@/lib/prisma';
 import type { Expense } from '@/types';
 import type { ExpenseFormValues } from '@/lib/validations';
 

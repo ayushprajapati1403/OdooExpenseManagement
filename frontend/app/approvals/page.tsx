@@ -11,7 +11,7 @@ import { NotebookContainer } from '@/components/layout/notebook-container';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { apiClient } from '@/lib/supabase';
+import { apiClient } from '@/lib/prisma';
 import type {
   ApprovalRequest,
   ApprovalActionRecord,
@@ -122,10 +122,21 @@ function ApprovalsPage() {
     }
   };
 
-  const handleViewDetails = (id: string) => {
+  const handleViewDetails = async (id: string) => {
     const approval = approvals.find((a) => a.id === id);
     if (approval) {
       setSelectedApproval(approval);
+      
+      // Load approval history for this expense
+      try {
+        console.log('🔍 Loading approval history for expense:', approval.expenseId);
+        const history = await apiClient.getApprovalHistory(approval.expenseId);
+        console.log('📊 Approval history loaded:', history);
+        setActions(history);
+      } catch (error) {
+        console.error('Failed to load approval history:', error);
+        setActions([]);
+      }
     }
   };
 

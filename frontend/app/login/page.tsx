@@ -19,7 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { loginFormSchema, type LoginFormValues } from '@/lib/validations';
-import { signIn } from '@/lib/supabase';
+import { signIn } from '@/lib/prisma';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function LoginPage() {

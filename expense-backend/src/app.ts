@@ -6,7 +6,16 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+
+// JSON parsing middleware - exclude file upload routes
+app.use((req, res, next) => {
+  // Skip JSON parsing for file upload routes
+  if (req.path.includes('/ocr/') && req.method === 'POST') {
+    return next();
+  }
+  express.json()(req, res, next);
+});
+
 app.use(express.urlencoded({ extended: true }));
 
 // Health check

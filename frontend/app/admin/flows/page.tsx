@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, GitBranch, CreditCard as Edit, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, GitBranch, CreditCard as Edit, Trash2, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { FlowStepForm } from '@/components/approval/flow-step-form';
@@ -20,44 +20,50 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { apiClient } from '@/lib/prisma';
 import type { ApprovalFlow, ApprovalFlowStep } from '@/types';
 
 function ApprovalFlowsPage() {
   const [flows, setFlows] = React.useState<ApprovalFlow[]>([]);
   const [showForm, setShowForm] = React.useState(false);
   const [editingFlow, setEditingFlow] = React.useState<ApprovalFlow | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isSaving, setIsSaving] = React.useState(false);
   const [formData, setFormData] = React.useState({
     name: '',
     description: '',
+    ruleType: 'UNANIMOUS' as 'UNANIMOUS' | 'PERCENTAGE' | 'SPECIFIC',
+    percentageThreshold: 75,
+    specificApproverId: '',
   });
   const [steps, setSteps] = React.useState<Partial<ApprovalFlowStep>[]>([]);
   const { toast } = useToast();
 
+  // Load approval flows on component mount
   React.useEffect(() => {
-    const mockFlows: ApprovalFlow[] = [
-      {
-        id: '1',
-        name: 'Standard Approval Flow',
-        description: 'Default approval flow for all expenses',
-        isActive: true,
-        createdBy: 'user-1',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        name: 'Executive Approval',
-        description: 'High-value expense approval requiring executive sign-off',
-        isActive: false,
-        createdBy: 'user-1',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    ];
-    setFlows(mockFlows);
+    loadApprovalFlows();
   }, []);
 
-  const handleCreateFlow = () => {
+  const loadApprovalFlows = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🔍 Loading approval flows...');
+      const response = await apiClient.getApprovalFlows();
+      console.log('📊 Loaded approval flows:', response.approvalFlows?.length || 0);
+      setFlows(response.approvalFlows || []);
+    } catch (error) {
+      console.error('Failed to load approval flows:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load approval flows',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateFlow = async () => {
     if (!formData.name.trim()) {
       toast({
         title: 'Error',
@@ -76,28 +82,198 @@ function ApprovalFlowsPage() {
       return;
     }
 
-    const newFlow: ApprovalFlow = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: formData.name,
-      description: formData.description,
-      isActive: true,
-      createdBy: 'user-1',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    try {
+      setIsSaving(true);
+      console.log('🔧 Creating approval flow:', formData, steps);
+      console.log('🔧 Frontend steps:', steps);
+      
+      // Map frontend steps to backend format
+      const backendSteps = steps.map((step) => {
+        // For now, we'll use a simple mapping based on the step's ruleType
+        // This is a simplified approach - in a real app you'd have more complex logic
+        if (step.ruleType === 'specific_user' && step.approvers && step.approvers.length > 0) {
+          return {
+            specificUserId: step.approvers[0] // Use first approver as specific user
+          };
+        } else if (step.ruleType === 'any_user' || step.ruleType === 'percentage') {
+          // For now, default to MANAGER role for these types
+          return {
+            role: 'MANAGER'
+          };
+        } else {
+          // Default to MANAGER role
+          return {
+            role: 'MANAGER'
+          };
+        }
+      });
 
-    setFlows((prev) => [...prev, newFlow]);
-    toast({
-      title: 'Success',
-      description: 'Approval flow created successfully',
-    });
+      const flowData = {
+        name: formData.name,
+        description: formData.description,
+        ruleType: formData.ruleType,
+        percentageThreshold: formData.ruleType === 'PERCENTAGE' ? formData.percentageThreshold : null,
+        specificApproverId: formData.ruleType === 'SPECIFIC' ? formData.specificApproverId : null,
+        steps: backendSteps,
+      };
 
-    setShowForm(false);
-    setFormData({ name: '', description: '' });
-    setSteps([]);
+      const result = await apiClient.createApprovalFlow(flowData);
+      console.log('✅ Approval flow created:', result);
+      
+      toast({
+        title: 'Success',
+        description: result.message || 'Approval flow created successfully',
+      });
+
+      // Reload flows
+      await loadApprovalFlows();
+      
+      // Reset form
+      setShowForm(false);
+      setFormData({ 
+        name: '', 
+        description: '', 
+        ruleType: 'UNANIMOUS',
+        percentageThreshold: 75,
+        specificApproverId: ''
+      });
+      setSteps([]);
+    } catch (error: any) {
+      console.error('Failed to create approval flow:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create approval flow',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleToggleActive = (id: string) => {
+  const handleEditFlow = (flow: ApprovalFlow) => {
+    setEditingFlow(flow);
+    setFormData({
+      name: flow.name,
+      description: flow.description || '',
+      ruleType: flow.ruleType || 'UNANIMOUS',
+      percentageThreshold: flow.percentageThreshold || 75,
+      specificApproverId: flow.specificApproverId || '',
+    });
+    
+    // Map backend steps to frontend format
+    const frontendSteps = (flow.steps || []).map((step) => ({
+      id: step.id || Math.random().toString(36).substr(2, 9),
+      stepOrder: step.stepOrder || 1,
+      stepName: step.role ? `${step.role} Approval` : 'Specific User Approval',
+      ruleType: step.specificUserId ? 'specific_user' : 'any_user',
+      requiredApprovers: 1,
+      approvers: step.specificUserId ? [step.specificUserId] : [],
+    }));
+    
+    setSteps(frontendSteps);
+    setShowForm(true);
+  };
+
+  const handleUpdateFlow = async () => {
+    if (!editingFlow) return;
+
+    try {
+      setIsSaving(true);
+      console.log('🔧 Updating approval flow:', editingFlow.id, formData, steps);
+      
+      // Map frontend steps to backend format
+      const backendSteps = steps.map((step) => {
+        // For now, we'll use a simple mapping based on the step's ruleType
+        // This is a simplified approach - in a real app you'd have more complex logic
+        if (step.ruleType === 'specific_user' && step.approvers && step.approvers.length > 0) {
+          return {
+            specificUserId: step.approvers[0] // Use first approver as specific user
+          };
+        } else if (step.ruleType === 'any_user' || step.ruleType === 'percentage') {
+          // For now, default to MANAGER role for these types
+          return {
+            role: 'MANAGER'
+          };
+        } else {
+          // Default to MANAGER role
+          return {
+            role: 'MANAGER'
+          };
+        }
+      });
+
+      const flowData = {
+        name: formData.name,
+        description: formData.description,
+        ruleType: formData.ruleType,
+        percentageThreshold: formData.ruleType === 'PERCENTAGE' ? formData.percentageThreshold : null,
+        specificApproverId: formData.ruleType === 'SPECIFIC' ? formData.specificApproverId : null,
+        steps: backendSteps,
+      };
+
+      const result = await apiClient.updateApprovalFlow(editingFlow.id, flowData);
+      console.log('✅ Approval flow updated:', result);
+      
+      toast({
+        title: 'Success',
+        description: result.message || 'Approval flow updated successfully',
+      });
+
+      // Reload flows
+      await loadApprovalFlows();
+      
+      // Reset form
+      setShowForm(false);
+      setEditingFlow(null);
+      setFormData({ 
+        name: '', 
+        description: '', 
+        ruleType: 'UNANIMOUS',
+        percentageThreshold: 75,
+        specificApproverId: ''
+      });
+      setSteps([]);
+    } catch (error: any) {
+      console.error('Failed to update approval flow:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update approval flow',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteFlow = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this approval flow?')) {
+      return;
+    }
+
+    try {
+      console.log('🔧 Deleting approval flow:', id);
+      const result = await apiClient.deleteApprovalFlow(id);
+      console.log('✅ Approval flow deleted:', result);
+      
+      toast({
+        title: 'Success',
+        description: result.message || 'Approval flow deleted successfully',
+      });
+
+      // Reload flows
+      await loadApprovalFlows();
+    } catch (error: any) {
+      console.error('Failed to delete approval flow:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete approval flow',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleToggleActive = async (id: string) => {
+    // Note: Backend doesn't have isActive field, so this is just UI state
     setFlows((prev) =>
       prev.map((flow) =>
         flow.id === id ? { ...flow, isActive: !flow.isActive } : flow
@@ -110,13 +286,37 @@ function ApprovalFlowsPage() {
     });
   };
 
-  const handleDeleteFlow = (id: string) => {
-    setFlows((prev) => prev.filter((flow) => flow.id !== id));
-    toast({
-      title: 'Success',
-      description: 'Flow deleted successfully',
-    });
+  const handleFormSubmit = () => {
+    if (editingFlow) {
+      handleUpdateFlow();
+    } else {
+      handleCreateFlow();
+    }
   };
+
+  const handleFormCancel = () => {
+    setShowForm(false);
+    setEditingFlow(null);
+    setFormData({ 
+      name: '', 
+      description: '', 
+      ruleType: 'UNANIMOUS',
+      percentageThreshold: 75,
+      specificApproverId: ''
+    });
+    setSteps([]);
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading approval flows...</span>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -179,6 +379,19 @@ function ApprovalFlowsPage() {
                                 {flow.description}
                               </p>
                             )}
+                            <div className="mt-2 flex gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {flow.ruleType}
+                              </Badge>
+                              {flow.percentageThreshold && (
+                                <Badge variant="outline" className="text-xs">
+                                  {flow.percentageThreshold}%
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="text-xs">
+                                {flow.steps?.length || 0} steps
+                              </Badge>
+                            </div>
                           </div>
                           <Badge
                             variant={flow.isActive ? 'default' : 'secondary'}
@@ -201,7 +414,11 @@ function ApprovalFlowsPage() {
                           )}
                           {flow.isActive ? 'Deactivate' : 'Activate'}
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleEditFlow(flow)}
+                        >
                           <Edit className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
@@ -228,7 +445,7 @@ function ApprovalFlowsPage() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="handwriting-text text-2xl">
-              Create Approval Flow
+              {editingFlow ? 'Edit Approval Flow' : 'Create Approval Flow'}
             </DialogTitle>
           </DialogHeader>
 
@@ -262,23 +479,74 @@ function ApprovalFlowsPage() {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="ruleType" className="handwriting-text text-base">
+                Approval Rule Type
+              </Label>
+              <select
+                id="ruleType"
+                value={formData.ruleType}
+                onChange={(e) =>
+                  setFormData((prev) => ({ 
+                    ...prev, 
+                    ruleType: e.target.value as 'UNANIMOUS' | 'PERCENTAGE' | 'SPECIFIC'
+                  }))
+                }
+                className="w-full p-2 border rounded-md"
+              >
+                <option value="UNANIMOUS">Unanimous (All approvers must approve)</option>
+                <option value="PERCENTAGE">Percentage (Threshold-based)</option>
+                <option value="SPECIFIC">Specific Approver</option>
+              </select>
+            </div>
+
+            {formData.ruleType === 'PERCENTAGE' && (
+              <div className="space-y-2">
+                <Label htmlFor="percentageThreshold" className="handwriting-text text-base">
+                  Percentage Threshold
+                </Label>
+                <Input
+                  id="percentageThreshold"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={formData.percentageThreshold}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ 
+                      ...prev, 
+                      percentageThreshold: parseInt(e.target.value) || 75
+                    }))
+                  }
+                  placeholder="75"
+                />
+              </div>
+            )}
+
             <FlowStepForm steps={steps} onChange={setSteps} />
 
             <div className="flex gap-3 pt-4 border-t">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  setShowForm(false);
-                  setFormData({ name: '', description: '' });
-                  setSteps([]);
-                }}
+                onClick={handleFormCancel}
                 className="flex-1"
+                disabled={isSaving}
               >
                 Cancel
               </Button>
-              <Button onClick={handleCreateFlow} className="flex-1">
-                Create Flow
+              <Button 
+                onClick={handleFormSubmit} 
+                className="flex-1"
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {editingFlow ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  editingFlow ? 'Update Flow' : 'Create Flow'
+                )}
               </Button>
             </div>
           </div>

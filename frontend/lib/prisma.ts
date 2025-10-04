@@ -189,7 +189,7 @@ class ApiClient {
     // Map backend data to frontend format
     response.expenses = response.expenses.map(expense => ({
       id: expense.id,
-      title: expense.description || 'Untitled Expense', // Map description to title
+      title: expense.description || `Expense ${expense.id.slice(-4)}`, // Better fallback title
       amount: Number(expense.amount) || 0,
       category: this.mapCategoryToFrontend(expense.category),
       date: expense.date,
@@ -363,16 +363,141 @@ class ApiClient {
     return result;
   }
 
-  async rejectExpense(requestId: string, comment?: string) {
-    console.log('🔧 API Client: Rejecting expense', requestId, comment);
-    const result = await this.request<{
+  async getApprovalHistory(expenseId: string) {
+    const response = await this.request<{
+      approvalHistory: any[];
+    }>(`/flows/expense/${expenseId}/history`);
+    
+    // Map backend approval history to frontend format
+    const mappedHistory = response.approvalHistory.map(history => ({
+      id: history.id,
+      requestId: history.requestId || expenseId,
+      action: history.status.toLowerCase(), // Convert APPROVED to approved
+      approverName: history.approver?.name || 'Unknown Approver',
+      stepName: `Step ${history.stepOrder}`,
+      comment: history.comment || '',
+      createdAt: history.decidedAt || history.createdAt
+    }));
+    
+    return mappedHistory;
+  }
+
+  // Approval Flow Management
+  async getApprovalFlows() {
+    const response = await this.request<{
+      approvalFlows: any[];
+    }>('/flows/approval-flows');
+    
+    // Map backend approval flow data to frontend format
+    response.approvalFlows = response.approvalFlows.map(flow => ({
+      id: flow.id,
+      name: flow.name,
+      description: flow.description || '',
+      ruleType: flow.ruleType,
+      percentageThreshold: flow.percentageThreshold,
+      specificApproverId: flow.specificApproverId,
+      companyId: flow.companyId,
+      isActive: true, // Backend doesn't have isActive field, default to true
+      createdBy: 'system', // Backend doesn't track creator
+      createdAt: flow.createdAt || new Date().toISOString(),
+      updatedAt: flow.updatedAt || new Date().toISOString(),
+      steps: flow.steps || []
+    }));
+    
+    return response;
+  }
+
+  async getApprovalFlow(flowId: string) {
+    const response = await this.request<{
+      approvalFlow: any;
+    }>(`/flows/approval-flows/${flowId}`);
+    
+    // Map backend approval flow data to frontend format
+    const flow = response.approvalFlow;
+    return {
+      id: flow.id,
+      name: flow.name,
+      description: flow.description || '',
+      ruleType: flow.ruleType,
+      percentageThreshold: flow.percentageThreshold,
+      specificApproverId: flow.specificApproverId,
+      companyId: flow.companyId,
+      isActive: true,
+      createdBy: 'system',
+      createdAt: flow.createdAt || new Date().toISOString(),
+      updatedAt: flow.updatedAt || new Date().toISOString(),
+      steps: flow.steps || []
+    };
+  }
+
+  async createApprovalFlow(flowData: any) {
+    const response = await this.request<{
       message: string;
-    }>(`/flows/${requestId}/reject`, {
+      approvalFlow: any;
+    }>('/flows/approval-flows', {
       method: 'POST',
-      body: JSON.stringify({ comment }),
+      body: JSON.stringify(flowData),
     });
-    console.log('🔧 API Client: Rejection result', result);
-    return result;
+    
+    // Map backend response to frontend format
+    const flow = response.approvalFlow;
+    return {
+      message: response.message,
+      approvalFlow: {
+        id: flow.id,
+        name: flow.name,
+        description: flow.description || '',
+        ruleType: flow.ruleType,
+        percentageThreshold: flow.percentageThreshold,
+        specificApproverId: flow.specificApproverId,
+        companyId: flow.companyId,
+        isActive: true,
+        createdBy: 'system',
+        createdAt: flow.createdAt || new Date().toISOString(),
+        updatedAt: flow.updatedAt || new Date().toISOString(),
+        steps: flow.steps || []
+      }
+    };
+  }
+
+  async updateApprovalFlow(flowId: string, flowData: any) {
+    const response = await this.request<{
+      message: string;
+      approvalFlow: any;
+    }>(`/flows/approval-flows/${flowId}`, {
+      method: 'PUT',
+      body: JSON.stringify(flowData),
+    });
+    
+    // Map backend response to frontend format
+    const flow = response.approvalFlow;
+    return {
+      message: response.message,
+      approvalFlow: {
+        id: flow.id,
+        name: flow.name,
+        description: flow.description || '',
+        ruleType: flow.ruleType,
+        percentageThreshold: flow.percentageThreshold,
+        specificApproverId: flow.specificApproverId,
+        companyId: flow.companyId,
+        isActive: true,
+        createdBy: 'system',
+        createdAt: flow.createdAt || new Date().toISOString(),
+        updatedAt: flow.updatedAt || new Date().toISOString(),
+        steps: flow.steps || []
+      }
+    };
+  }
+
+  async deleteApprovalFlow(flowId: string) {
+    const response = await this.request<{
+      message: string;
+    }>(`/flows/approval-flows/${flowId}`, {
+      method: 'DELETE',
+    });
+    
+    return response;
   }
 
   // Company Management

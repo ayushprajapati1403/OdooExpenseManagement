@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { apiClient, type AuthUser } from '@/lib/supabase';
+import { apiClient, type AuthUser } from '@/lib/prisma';
 
 interface AuthContextType {
   user: AuthUser | null;

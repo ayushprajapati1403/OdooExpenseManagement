@@ -11,7 +11,7 @@ import { RecentExpenses } from '@/components/dashboard/recent-expenses';
 import { ExpenseForm } from '@/components/expense/expense-form';
 import { SkeletonCard, SkeletonList } from '@/components/dashboard/skeleton-card';
 import { ProtectedRoute } from '@/components/auth/protected-route';
-import { apiClient } from '@/lib/supabase';
+import { apiClient } from '@/lib/prisma';
 import type { Expense } from '@/types';
 import type { ExpenseFormValues } from '@/lib/validations';
 
