@@ -1,6 +1,6 @@
-const axios = require('axios');
+import axios from 'axios';
 
-const BASE_URL = 'http://localhost:3000/api';
+const BASE_URL = 'http://localhost:4000/api';
 
 async function testFlowModule() {
   console.log('🚀 Testing Flow Management Module...\n');
@@ -8,48 +8,83 @@ async function testFlowModule() {
   let adminToken;
   let managerToken;
   let employeeToken;
+  let managerUserId;
   let approvalFlowId;
   let expenseId;
   let approvalRequestId;
 
   try {
-    // Test 1: Create Admin User
-    console.log('1. Creating Admin User...');
-    const signupResponse = await axios.post(`${BASE_URL}/auth/signup`, {
-      email: 'admin@flowmodule.com',
-      password: 'password123',
-      name: 'Admin User',
-      country: 'United States'
-    });
-    adminToken = signupResponse.data.token;
-    console.log('✅ Admin user created:', signupResponse.data.user.email);
+    // Test 1: Login as Admin User (or create if doesn't exist)
+    console.log('1. Logging in as Admin User...');
+    try {
+      const loginResponse = await axios.post(`${BASE_URL}/auth/login`, {
+        email: 'admin@flowmodule.com',
+        password: 'password123'
+      });
+      adminToken = loginResponse.data.token;
+      console.log('✅ Admin login successful:', loginResponse.data.user.email);
+    } catch (loginError) {
+      console.log('Login failed, creating admin user...');
+      const signupResponse = await axios.post(`${BASE_URL}/auth/signup`, {
+        email: 'admin@flowmodule.com',
+        password: 'password123',
+        name: 'Admin User',
+        country: 'United States'
+      });
+      adminToken = signupResponse.data.token;
+      console.log('✅ Admin user created:', signupResponse.data.user.email);
+    }
     console.log('');
 
-    // Test 2: Create Manager User
+    // Test 2: Create Manager User (or login if exists)
     console.log('2. Creating Manager User...');
-    const managerResponse = await axios.post(`${BASE_URL}/users`, {
-      email: 'manager@flowmodule.com',
-      password: 'password123',
-      name: 'Manager User',
-      role: 'MANAGER',
-      isManagerApprover: true
-    }, {
-      headers: { Authorization: `Bearer ${adminToken}` }
-    });
-    console.log('✅ Manager created:', managerResponse.data.user.email);
+    try {
+      const managerResponse = await axios.post(`${BASE_URL}/users`, {
+        email: 'manager@flowmodule.com',
+        password: 'password123',
+        name: 'Manager User',
+        role: 'MANAGER',
+        isManagerApprover: true
+      }, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      managerToken = managerResponse.data.token;
+      managerUserId = managerResponse.data.user.id;
+      console.log('✅ Manager created:', managerResponse.data.user.email);
+    } catch (error) {
+      console.log('Manager already exists, logging in...');
+      const loginResponse = await axios.post(`${BASE_URL}/auth/login`, {
+        email: 'manager@flowmodule.com',
+        password: 'password123'
+      });
+      managerToken = loginResponse.data.token;
+      managerUserId = loginResponse.data.user.id;
+      console.log('✅ Manager login successful:', loginResponse.data.user.email);
+    }
     console.log('');
 
-    // Test 3: Create Employee User
+    // Test 3: Create Employee User (or login if exists)
     console.log('3. Creating Employee User...');
-    const employeeResponse = await axios.post(`${BASE_URL}/users`, {
-      email: 'employee@flowmodule.com',
-      password: 'password123',
-      name: 'Employee User',
-      role: 'EMPLOYEE'
-    }, {
-      headers: { Authorization: `Bearer ${adminToken}` }
-    });
-    console.log('✅ Employee created:', employeeResponse.data.user.email);
+    try {
+      const employeeResponse = await axios.post(`${BASE_URL}/users`, {
+        email: 'employee@flowmodule.com',
+        password: 'password123',
+        name: 'Employee User',
+        role: 'EMPLOYEE'
+      }, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      employeeToken = employeeResponse.data.token;
+      console.log('✅ Employee created:', employeeResponse.data.user.email);
+    } catch (error) {
+      console.log('Employee already exists, logging in...');
+      const loginResponse = await axios.post(`${BASE_URL}/auth/login`, {
+        email: 'employee@flowmodule.com',
+        password: 'password123'
+      });
+      employeeToken = loginResponse.data.token;
+      console.log('✅ Employee login successful:', loginResponse.data.user.email);
+    }
     console.log('');
 
     // Test 4: Login as Employee
@@ -69,6 +104,7 @@ async function testFlowModule() {
       password: 'password123'
     });
     managerToken = managerLogin.data.token;
+    managerUserId = managerLogin.data.user.id;
     console.log('✅ Manager login successful');
     console.log('');
 
@@ -94,9 +130,9 @@ async function testFlowModule() {
     const specificFlowResponse = await axios.post(`${BASE_URL}/flows/approval-flows`, {
       name: 'Specific User Flow',
       ruleType: 'SPECIFIC',
-      specificApproverId: managerResponse.data.user.id,
+      specificApproverId: managerUserId,
       steps: [
-        { specificUserId: managerResponse.data.user.id },
+        { specificUserId: managerUserId },
         { role: 'ADMIN' }
       ]
     }, {

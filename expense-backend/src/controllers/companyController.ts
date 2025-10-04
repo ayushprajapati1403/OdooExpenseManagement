@@ -70,7 +70,7 @@ export class CompanyController {
             orderBy: { stepOrder: 'asc' }
           }
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { name: 'asc' }
       });
 
       res.json({ approvalFlows });
@@ -215,7 +215,12 @@ export class CompanyController {
         return res.status(404).json({ error: 'Approval flow not found' });
       }
 
-      // Delete approval flow (cascade will handle steps)
+      // Delete approval flow steps first
+      await prisma.approvalFlowStep.deleteMany({
+        where: { flowId }
+      });
+
+      // Then delete the approval flow
       await prisma.approvalFlow.delete({
         where: { id: flowId }
       });

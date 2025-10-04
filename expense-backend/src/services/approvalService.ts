@@ -196,7 +196,7 @@ export class ApprovalService {
             }
           }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { stepOrder: 'asc' },
         skip,
         take: limit
       });
@@ -328,10 +328,7 @@ export class ApprovalService {
         prisma.approvalRequest.groupBy({
           by: ['status'],
           where: {
-            expense: { companyId },
-            createdAt: {
-              gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-            }
+            expense: { companyId }
           },
           _count: true
         })

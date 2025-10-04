@@ -1,6 +1,6 @@
-const axios = require('axios');
+import axios from 'axios';
 
-const BASE_URL = 'http://localhost:3000/api';
+const BASE_URL = 'http://localhost:4000/api';
 
 async function testUserModule() {
   console.log('🚀 Testing User Management Module...\n');
@@ -10,48 +10,78 @@ async function testUserModule() {
   let employeeUserId;
 
   try {
-    // Test 1: Create Admin User
-    console.log('1. Creating Admin User...');
-    const signupResponse = await axios.post(`${BASE_URL}/auth/signup`, {
-      email: 'admin@usermodule.com',
-      password: 'password123',
-      name: 'Admin User',
-      country: 'United States'
-    });
-    adminToken = signupResponse.data.token;
-    console.log('✅ Admin user created:', signupResponse.data.user.email);
+    // Test 1: Login as Admin User (or create if doesn't exist)
+    console.log('1. Logging in as Admin User...');
+    try {
+      const loginResponse = await axios.post(`${BASE_URL}/auth/login`, {
+        email: 'admin@usermodule.com',
+        password: 'password123'
+      });
+      adminToken = loginResponse.data.token;
+      console.log('✅ Admin login successful:', loginResponse.data.user.email);
+    } catch (loginError) {
+      console.log('Login failed, creating admin user...');
+      const signupResponse = await axios.post(`${BASE_URL}/auth/signup`, {
+        email: 'admin@usermodule.com',
+        password: 'password123',
+        name: 'Admin User',
+        country: 'United States'
+      });
+      adminToken = signupResponse.data.token;
+      console.log('✅ Admin user created:', signupResponse.data.user.email);
+    }
     console.log('');
 
-    // Test 2: Create Employee User
+    // Test 2: Create Employee User (or login if exists)
     console.log('2. Creating Employee User...');
-    const employeeResponse = await axios.post(`${BASE_URL}/users`, {
-      email: 'employee@usermodule.com',
-      password: 'password123',
-      name: 'Employee User',
-      role: 'EMPLOYEE'
-    }, {
-      headers: { Authorization: `Bearer ${adminToken}` }
-    });
-    employeeUserId = employeeResponse.data.user.id;
-    console.log('✅ Employee created:', employeeResponse.data.user.email);
-    console.log('   Role:', employeeResponse.data.user.role);
+    try {
+      const employeeResponse = await axios.post(`${BASE_URL}/users`, {
+        email: 'employee@usermodule.com',
+        password: 'password123',
+        name: 'Employee User',
+        role: 'EMPLOYEE'
+      }, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      employeeUserId = employeeResponse.data.user.id;
+      console.log('✅ Employee created:', employeeResponse.data.user.email);
+      console.log('   Role:', employeeResponse.data.user.role);
+    } catch (error) {
+      console.log('Employee already exists, getting user info...');
+      const loginResponse = await axios.post(`${BASE_URL}/auth/login`, {
+        email: 'employee@usermodule.com',
+        password: 'password123'
+      });
+      employeeUserId = loginResponse.data.user.id;
+      console.log('✅ Employee login successful:', loginResponse.data.user.email);
+    }
     console.log('');
 
-    // Test 3: Create Manager User
+    // Test 3: Create Manager User (or login if exists)
     console.log('3. Creating Manager User...');
-    const managerResponse = await axios.post(`${BASE_URL}/users`, {
-      email: 'manager@usermodule.com',
-      password: 'password123',
-      name: 'Manager User',
-      role: 'MANAGER',
-      isManagerApprover: true
-    }, {
-      headers: { Authorization: `Bearer ${adminToken}` }
-    });
-    managerUserId = managerResponse.data.user.id;
-    console.log('✅ Manager created:', managerResponse.data.user.email);
-    console.log('   Role:', managerResponse.data.user.role);
-    console.log('   Is Manager Approver:', managerResponse.data.user.isManagerApprover);
+    try {
+      const managerResponse = await axios.post(`${BASE_URL}/users`, {
+        email: 'manager@usermodule.com',
+        password: 'password123',
+        name: 'Manager User',
+        role: 'MANAGER',
+        isManagerApprover: true
+      }, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      managerUserId = managerResponse.data.user.id;
+      console.log('✅ Manager created:', managerResponse.data.user.email);
+      console.log('   Role:', managerResponse.data.user.role);
+      console.log('   Is Manager Approver:', managerResponse.data.user.isManagerApprover);
+    } catch (error) {
+      console.log('Manager already exists, getting user info...');
+      const loginResponse = await axios.post(`${BASE_URL}/auth/login`, {
+        email: 'manager@usermodule.com',
+        password: 'password123'
+      });
+      managerUserId = loginResponse.data.user.id;
+      console.log('✅ Manager login successful:', loginResponse.data.user.email);
+    }
     console.log('');
 
     // Test 4: Get All Users

@@ -230,8 +230,20 @@ export class ExpenseController {
         return res.status(404).json({ error: 'Expense not found' });
       }
 
-      // Only allow updates if expense is pending and user owns it
-      if (expense.status !== 'PENDING' || expense.userId !== req.user!.userId) {
+      // Check if user owns the expense
+      if (expense.userId !== req.user!.userId) {
+        return res.status(403).json({ error: 'Cannot update this expense' });
+      }
+
+      // Check if expense can be updated (pending or auto-approved)
+      const approvalRequests = await prisma.approvalRequest.findMany({
+        where: { expenseId }
+      });
+
+      // Allow updates if:
+      // 1. Expense is PENDING, OR
+      // 2. Expense is APPROVED but has no approval requests (auto-approved)
+      if (expense.status !== 'PENDING' && (expense.status !== 'APPROVED' || approvalRequests.length > 0)) {
         return res.status(403).json({ error: 'Cannot update this expense' });
       }
 
