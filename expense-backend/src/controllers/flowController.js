@@ -38,13 +38,10 @@ export class FlowController {
                 where: { companyId: currentUser.companyId },
                 include: {
                     steps: {
-                        orderBy: { stepOrder: 'asc' },
-                        include: {
-                            flow: false
-                        }
+                        orderBy: { stepOrder: 'asc' }
                     }
                 },
-                orderBy: { createdAt: 'desc' }
+                orderBy: { name: 'asc' }
             });
             res.json({ approvalFlows });
         }
@@ -169,7 +166,11 @@ export class FlowController {
             if (!existingFlow) {
                 return res.status(404).json({ error: 'Approval flow not found' });
             }
-            // Delete approval flow (cascade will handle steps)
+            // Delete approval flow steps first
+            await prisma.approvalFlowStep.deleteMany({
+                where: { flowId }
+            });
+            // Then delete the approval flow
             await prisma.approvalFlow.delete({
                 where: { id: flowId }
             });
@@ -178,6 +179,23 @@ export class FlowController {
         catch (error) {
             console.error('Delete approval flow error:', error);
             res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+    /**
+     * Get all approvals for the current user (pending, approved, rejected)
+     */
+    async getAllApprovals(req, res) {
+        try {
+            const { page = 1, limit = 10 } = req.query;
+            const result = await this.approvalService.getAllApprovals(req.user.userId, parseInt(page), parseInt(limit));
+            res.json({
+                approvals: result.approvals,
+                pagination: result.pagination
+            });
+        }
+        catch (error) {
+            console.error('Error getting all approvals:', error);
+            res.status(500).json({ error: 'Failed to get approvals' });
         }
     }
     async getPendingApprovals(req, res) {
@@ -312,7 +330,7 @@ export class FlowController {
                         }
                     }
                 },
-                orderBy: { createdAt: 'desc' },
+                orderBy: { stepOrder: 'asc' },
                 skip: (parseInt(page) - 1) * parseInt(limit),
                 take: parseInt(limit)
             });

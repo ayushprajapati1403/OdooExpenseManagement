@@ -221,19 +221,43 @@ export class FlowController {
     }
   }
 
-  async getPendingApprovals(req: AuthenticatedRequest, res: Response) {
+  /**
+   * Get all approvals for the current user (pending, approved, rejected)
+   */
+  async getAllApprovals(req: AuthenticatedRequest, res: Response) {
     try {
       const { page = 1, limit = 10 } = req.query;
 
-      const result = await this.approvalService.getPendingApprovals(
+      const result = await this.approvalService.getAllApprovals(
         req.user!.userId,
         parseInt(page as string),
         parseInt(limit as string)
       );
 
+      res.json({
+        approvals: result.approvals,
+        pagination: result.pagination
+      });
+    } catch (error) {
+      console.error('Error getting all approvals:', error);
+      res.status(500).json({ error: 'Failed to get approvals' });
+    }
+  }
+
+  async getPendingApprovals(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { page = 1, limit = 10, includeAll = false } = req.query;
+
+      const result = await this.approvalService.getPendingApprovals(
+        req.user!.userId,
+        parseInt(page as string),
+        parseInt(limit as string),
+        includeAll === 'true' || includeAll === true
+      );
+
       res.json(result);
     } catch (error) {
-      console.error('Get pending approvals error:', error);
+      console.error('Get approvals error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

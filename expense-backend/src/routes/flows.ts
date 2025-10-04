@@ -41,6 +41,13 @@ router.delete('/approval-flows/:flowId',
 );
 
 // Approval Workflow (Manager/Admin)
+// Get all approvals for the current user (pending, approved, rejected)
+router.get('/all', 
+  authenticateToken, 
+  requireManager, 
+  flowController.getAllApprovals.bind(flowController)
+);
+
 router.get('/pending', 
   authenticateToken, 
   requireManager, 

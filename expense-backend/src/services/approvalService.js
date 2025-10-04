@@ -122,6 +122,54 @@ export class ApprovalService {
         }
     }
     /**
+     * Get all approvals for a specific approver (pending, approved, rejected)
+     */
+    async getAllApprovals(approverId, page = 1, limit = 10) {
+        try {
+            const skip = (page - 1) * limit;
+            const approvals = await prisma.approvalRequest.findMany({
+                where: {
+                    approverId
+                },
+                include: {
+                    expense: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    email: true
+                                }
+                            },
+                            expenseLines: true
+                        }
+                    }
+                },
+                orderBy: {
+                    createdAt: 'desc'
+                },
+                skip,
+                take: limit
+            });
+            const total = await prisma.approvalRequest.count({
+                where: { approverId }
+            });
+            return {
+                approvals,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    pages: Math.ceil(total / limit)
+                }
+            };
+        }
+        catch (error) {
+            console.error('Error getting all approvals:', error);
+            throw new Error('Failed to get approvals');
+        }
+    }
+    /**
      * Get pending approvals for a specific approver
      */
     async getPendingApprovals(approverId, page = 1, limit = 10) {
@@ -146,7 +194,7 @@ export class ApprovalService {
                         }
                     }
                 },
-                orderBy: { createdAt: 'desc' },
+                orderBy: { stepOrder: 'asc' },
                 skip,
                 take: limit
             });
@@ -265,10 +313,7 @@ export class ApprovalService {
                 prisma.approvalRequest.groupBy({
                     by: ['status'],
                     where: {
-                        expense: { companyId },
-                        createdAt: {
-                            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-                        }
+                        expense: { companyId }
                     },
                     _count: true
                 })

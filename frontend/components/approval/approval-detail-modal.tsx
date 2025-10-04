@@ -50,6 +50,22 @@ export function ApprovalDetailModal({
 
   const expense = approval.expense;
 
+  // Debug logging
+  console.log('🔍 ApprovalDetailModal data:', {
+    approvalId: approval.id,
+    approvalStatus: approval.status,
+    currentStep: approval.currentStep,
+    totalSteps: approval.totalSteps,
+    expenseTitle: expense.title,
+    expenseAmount: expense.amount,
+    expenseCategory: expense.category,
+    expenseDate: expense.date,
+    userName: expense.user?.name,
+    userEmail: expense.user?.email,
+    userDepartment: expense.user?.department,
+    expenseLocation: expense.location
+  });
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -110,19 +126,19 @@ export function ApprovalDetailModal({
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">Submitted by:</span>
-                  <span className="font-medium">John Doe</span>
+                  <span className="font-medium">{expense.user?.name || 'Unknown User'}</span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <Building className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">Department:</span>
-                  <span className="font-medium">Engineering</span>
+                  <span className="font-medium">{expense.user?.department || 'Not specified'}</span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">Location:</span>
-                  <span className="font-medium">San Francisco, CA</span>
+                  <span className="font-medium">{expense.location || 'Not specified'}</span>
                 </div>
               </div>
 
@@ -195,7 +211,7 @@ export function ApprovalDetailModal({
             <ApprovalTimeline
               actions={actions}
               currentStep={approval.currentStep}
-              totalSteps={3}
+              totalSteps={approval.totalSteps || 1}
             />
           </div>
         </div>

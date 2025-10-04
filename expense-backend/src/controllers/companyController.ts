@@ -3,6 +3,120 @@ import prisma from '../prisma.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
 
 export class CompanyController {
+  // Get company settings
+  async getCompanySettings(req: AuthenticatedRequest, res: Response) {
+    try {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: req.user!.userId }
+      });
+
+      if (!currentUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const company = await prisma.company.findUnique({
+        where: { id: currentUser.companyId }
+      });
+
+      if (!company) {
+        return res.status(404).json({ error: 'Company not found' });
+      }
+
+      res.json({
+        company: {
+          id: company.id,
+          name: company.name,
+          currency: company.currency,
+          country: company.country,
+          defaultApprovalFlow: company.defaultApprovalFlow,
+          logoUrl: company.logoUrl,
+          website: company.website,
+          industry: company.industry,
+          size: company.size,
+          address: company.address,
+          timezone: company.timezone,
+          fiscalYearStart: company.fiscalYearStart,
+          createdAt: company.createdAt,
+          updatedAt: company.updatedAt
+        }
+      });
+    } catch (error) {
+      console.error('Error getting company settings:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  // Update company settings
+  async updateCompanySettings(req: AuthenticatedRequest, res: Response) {
+    try {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: req.user!.userId }
+      });
+
+      if (!currentUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (currentUser.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      const {
+        name,
+        currency,
+        country,
+        defaultApprovalFlow,
+        logoUrl,
+        website,
+        industry,
+        size,
+        address,
+        timezone,
+        fiscalYearStart
+      } = req.body;
+
+      const updatedCompany = await prisma.company.update({
+        where: { id: currentUser.companyId },
+        data: {
+          name,
+          currency,
+          country,
+          defaultApprovalFlow,
+          logoUrl,
+          website,
+          industry,
+          size,
+          address,
+          timezone,
+          fiscalYearStart,
+          updatedAt: new Date()
+        }
+      });
+
+      res.json({
+        message: 'Company settings updated successfully',
+        company: {
+          id: updatedCompany.id,
+          name: updatedCompany.name,
+          currency: updatedCompany.currency,
+          country: updatedCompany.country,
+          defaultApprovalFlow: updatedCompany.defaultApprovalFlow,
+          logoUrl: updatedCompany.logoUrl,
+          website: updatedCompany.website,
+          industry: updatedCompany.industry,
+          size: updatedCompany.size,
+          address: updatedCompany.address,
+          timezone: updatedCompany.timezone,
+          fiscalYearStart: updatedCompany.fiscalYearStart,
+          createdAt: updatedCompany.createdAt,
+          updatedAt: updatedCompany.updatedAt
+        }
+      });
+    } catch (error) {
+      console.error('Error updating company settings:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
   async createApprovalFlow(req: AuthenticatedRequest, res: Response) {
     try {
       const { name, ruleType, percentageThreshold, specificApproverId, steps } = req.body;

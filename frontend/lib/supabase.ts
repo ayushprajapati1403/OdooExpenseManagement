@@ -186,13 +186,38 @@ class ApiClient {
       pagination: any;
     }>(`/expenses/my-expenses?page=${page}&limit=${limit}`);
     
-    // Ensure amount is converted to number
+    // Map backend data to frontend format
     response.expenses = response.expenses.map(expense => ({
-      ...expense,
-      amount: Number(expense.amount) || 0
+      id: expense.id,
+      title: expense.description || 'Untitled Expense', // Map description to title
+      amount: Number(expense.amount) || 0,
+      category: this.mapCategoryToFrontend(expense.category),
+      date: expense.date,
+      description: expense.description,
+      status: expense.status.toLowerCase(), // Convert PENDING to pending
+      currency: expense.currency,
+      lineItems: expense.expenseLines || [],
+      receiptUrl: expense.receiptImageUrl,
+      createdAt: expense.createdAt,
+      updatedAt: expense.createdAt // Backend doesn't have updatedAt yet
     }));
     
     return response;
+  }
+
+  private mapCategoryToFrontend(backendCategory: string): string {
+    const categoryMap: Record<string, string> = {
+      'Meals': 'food',
+      'Transport': 'transport',
+      'Entertainment': 'entertainment',
+      'Utilities': 'utilities',
+      'Shopping': 'shopping',
+      'Health': 'health',
+      'health': 'health', // Handle lowercase version
+      'Education': 'education',
+      'Other': 'other'
+    };
+    return categoryMap[backendCategory] || 'other';
   }
 
   async createExpense(expenseData: any) {
@@ -204,10 +229,26 @@ class ApiClient {
       body: JSON.stringify(expenseData),
     });
     
-    // Ensure amount is converted to number
-    response.expense.amount = Number(response.expense.amount) || 0;
+    // Map backend response to frontend format
+    const mappedExpense = {
+      id: response.expense.id,
+      title: response.expense.description || 'Untitled Expense',
+      amount: Number(response.expense.amount) || 0,
+      category: this.mapCategoryToFrontend(response.expense.category),
+      date: response.expense.date,
+      description: response.expense.description,
+      status: response.expense.status.toLowerCase(),
+      currency: response.expense.currency,
+      lineItems: response.expense.expenseLines || [],
+      receiptUrl: response.expense.receiptImageUrl,
+      createdAt: response.expense.createdAt,
+      updatedAt: response.expense.createdAt
+    };
     
-    return response;
+    return {
+      message: response.message,
+      expense: mappedExpense
+    };
   }
 
   async updateExpense(expenseId: string, expenseData: any) {
@@ -229,29 +270,109 @@ class ApiClient {
   }
 
   // Approval Management
-  async getPendingApprovals(page = 1, limit = 10) {
-    return this.request<{
+  async getPendingApprovals(page = 1, limit = 10, includeAll = false) {
+    const includeAllParam = includeAll ? '&includeAll=true' : '';
+    const response = await this.request<{
       approvals: any[];
       pagination: any;
-    }>(`/flows/pending?page=${page}&limit=${limit}`);
+    }>(`/flows/pending?page=${page}&limit=${limit}${includeAllParam}`);
+    
+    // Map backend approval data to frontend format
+    response.approvals = response.approvals.map(approval => {
+      console.log('🔧 API Client mapping approval:', {
+        id: approval.id,
+        description: approval.expense?.description,
+        descriptionType: typeof approval.expense?.description,
+        descriptionLength: approval.expense?.description?.length || 0
+      });
+      
+      return {
+        id: approval.id,
+        expenseId: approval.expenseId,
+        flowId: approval.flowId || 'default-flow',
+        currentStep: approval.stepOrder,
+        totalSteps: 1, // For now, hardcode to 1 since current flow has 1 step
+        status: approval.status.toLowerCase(), // Convert PENDING to pending
+        createdAt: approval.createdAt,
+        updatedAt: approval.decidedAt || approval.createdAt,
+        expense: approval.expense ? {
+          id: approval.expense.id,
+          title: approval.expense.description || 'Untitled Expense',
+          amount: Number(approval.expense.amount) || 0,
+          category: this.mapCategoryToFrontend(approval.expense.category),
+          date: approval.expense.date,
+          description: approval.expense.description,
+          status: approval.expense.status.toLowerCase(),
+          currency: approval.expense.currency,
+          lineItems: approval.expense.expenseLines || [],
+          receiptUrl: approval.expense.receiptImageUrl,
+          createdAt: approval.expense.createdAt,
+          updatedAt: approval.expense.createdAt,
+          user: approval.expense.user
+        } : null
+      };
+    });
+    
+    return response;
+  }
+
+  async getAllApprovals(page = 1, limit = 10) {
+    const response = await this.request<{
+      approvals: any[];
+      pagination: any;
+    }>(`/flows/all?page=${page}&limit=${limit}`);
+    
+    // Map backend approval data to frontend format
+    response.approvals = response.approvals.map(approval => ({
+      id: approval.id,
+      expenseId: approval.expenseId,
+      flowId: approval.flowId || 'default-flow',
+      currentStep: approval.stepOrder,
+      status: approval.status.toLowerCase(), // Convert PENDING to pending
+      createdAt: approval.createdAt,
+      updatedAt: approval.decidedAt || approval.createdAt,
+      expense: approval.expense ? {
+        id: approval.expense.id,
+        title: approval.expense.description || 'Untitled Expense',
+        amount: Number(approval.expense.amount) || 0,
+        category: this.mapCategoryToFrontend(approval.expense.category),
+        date: approval.expense.date,
+        description: approval.expense.description,
+        status: approval.expense.status.toLowerCase(),
+        currency: approval.expense.currency,
+        lineItems: approval.expense.expenseLines || [],
+        receiptUrl: approval.expense.receiptImageUrl,
+        createdAt: approval.expense.createdAt,
+        updatedAt: approval.expense.createdAt,
+        user: approval.expense.user
+      } : null
+    }));
+    
+    return response;
   }
 
   async approveExpense(requestId: string, comment?: string) {
-    return this.request<{
+    console.log('🔧 API Client: Approving expense', requestId, comment);
+    const result = await this.request<{
       message: string;
     }>(`/flows/${requestId}/approve`, {
       method: 'POST',
       body: JSON.stringify({ comment }),
     });
+    console.log('🔧 API Client: Approval result', result);
+    return result;
   }
 
   async rejectExpense(requestId: string, comment?: string) {
-    return this.request<{
+    console.log('🔧 API Client: Rejecting expense', requestId, comment);
+    const result = await this.request<{
       message: string;
     }>(`/flows/${requestId}/reject`, {
       method: 'POST',
       body: JSON.stringify({ comment }),
     });
+    console.log('🔧 API Client: Rejection result', result);
+    return result;
   }
 
   // Company Management
@@ -290,6 +411,38 @@ class ApiClient {
       expenses: any[];
       pagination: any;
     }>(`/company/expenses?page=${page}&limit=${limit}`);
+  }
+
+  // Company Settings
+  async getCompanySettings() {
+    return this.request<{
+      company: {
+        id: string;
+        name: string;
+        currency: string;
+        country: string;
+        defaultApprovalFlow?: string;
+        logoUrl?: string;
+        website?: string;
+        industry?: string;
+        size?: string;
+        address?: string;
+        timezone?: string;
+        fiscalYearStart?: string;
+        createdAt: string;
+        updatedAt: string;
+      };
+    }>('/company/settings');
+  }
+
+  async updateCompanySettings(settings: any) {
+    return this.request<{
+      message: string;
+      company: any;
+    }>('/company/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
   }
 
   // Approval Flows

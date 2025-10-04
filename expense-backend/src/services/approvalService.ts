@@ -171,16 +171,15 @@ export class ApprovalService {
   }
 
   /**
-   * Get pending approvals for a specific approver
+   * Get all approvals for a specific approver (pending, approved, rejected)
    */
-  async getPendingApprovals(approverId: string, page: number = 1, limit: number = 10) {
+  async getAllApprovals(approverId: string, page: number = 1, limit: number = 10) {
     try {
       const skip = (page - 1) * limit;
 
       const approvals = await prisma.approvalRequest.findMany({
         where: {
-          approverId,
-          status: 'PENDING'
+          approverId
         },
         include: {
           expense: {
@@ -196,16 +195,15 @@ export class ApprovalService {
             }
           }
         },
-        orderBy: { stepOrder: 'asc' },
+        orderBy: {
+          createdAt: 'desc'
+        },
         skip,
         take: limit
       });
 
       const total = await prisma.approvalRequest.count({
-        where: {
-          approverId,
-          status: 'PENDING'
-        }
+        where: { approverId }
       });
 
       return {
@@ -218,8 +216,64 @@ export class ApprovalService {
         }
       };
     } catch (error) {
-      console.error('Error getting pending approvals:', error);
-      throw new Error('Failed to get pending approvals');
+      console.error('Error getting all approvals:', error);
+      throw new Error('Failed to get approvals');
+    }
+  }
+
+  /**
+   * Get approvals for a specific approver (pending only or all)
+   */
+  async getPendingApprovals(approverId: string, page: number = 1, limit: number = 10, includeAll: boolean = false) {
+    try {
+      const skip = (page - 1) * limit;
+
+      const whereClause: any = {
+        approverId
+      };
+
+      // Only filter by PENDING status if includeAll is false
+      if (!includeAll) {
+        whereClause.status = 'PENDING';
+      }
+
+      const approvals = await prisma.approvalRequest.findMany({
+        where: whereClause,
+        include: {
+          expense: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              },
+              expenseLines: true
+            }
+          }
+        },
+        orderBy: { decidedAt: 'desc' },
+        skip,
+        take: limit
+      });
+
+      const total = await prisma.approvalRequest.count({
+        where: whereClause
+      });
+
+      return {
+        approvals,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      console.error('Error getting approvals:', error);
+      throw new Error('Failed to get approvals');
     }
   }
 

@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
 export declare class CompanyController {
+    getCompanySettings(req: AuthenticatedRequest, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
+    updateCompanySettings(req: AuthenticatedRequest, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
     createApprovalFlow(req: AuthenticatedRequest, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
     getAllApprovalFlows(req: AuthenticatedRequest, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
     getApprovalFlowById(req: AuthenticatedRequest, res: Response): Promise<Response<any, Record<string, any>> | undefined>;

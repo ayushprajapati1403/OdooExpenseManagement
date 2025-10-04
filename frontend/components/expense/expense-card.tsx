@@ -36,8 +36,24 @@ const categoryColors: Record<ExpenseCategory, string> = {
   other: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
 };
 
+const statusColors: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+};
+
+const statusLabels: Record<string, string> = {
+  pending: 'Pending',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
 export function ExpenseCard({ expense, onDelete }: ExpenseCardProps) {
   const formattedDate = format(new Date(expense.date), 'MMM dd, yyyy');
+  
+  // Ensure category exists in our mappings, fallback to 'other'
+  const safeCategory = expense.category in categoryIcons ? expense.category : 'other';
+  const safeStatus = expense.status in statusColors ? expense.status : 'pending';
 
   return (
     <motion.div
@@ -52,9 +68,12 @@ export function ExpenseCard({ expense, onDelete }: ExpenseCardProps) {
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <Badge className={categoryColors[expense.category]} variant="secondary">
-                  {categoryIcons[expense.category]}
-                  <span className="ml-1.5 capitalize">{expense.category}</span>
+                <Badge className={categoryColors[safeCategory]} variant="secondary">
+                  {categoryIcons[safeCategory]}
+                  <span className="ml-1.5 capitalize">{safeCategory}</span>
+                </Badge>
+                <Badge className={statusColors[safeStatus]} variant="secondary">
+                  {statusLabels[safeStatus]}
                 </Badge>
               </div>
               <h3 className="font-semibold text-lg mb-1 truncate">{expense.title}</h3>

@@ -12,6 +12,8 @@ router.get('/approval-flows/:flowId', authenticateToken, requireAdmin, flowContr
 router.put('/approval-flows/:flowId', authenticateToken, requireAdmin, validateApprovalFlow, flowController.updateApprovalFlow.bind(flowController));
 router.delete('/approval-flows/:flowId', authenticateToken, requireAdmin, flowController.deleteApprovalFlow.bind(flowController));
 // Approval Workflow (Manager/Admin)
+// Get all approvals for the current user (pending, approved, rejected)
+router.get('/all', authenticateToken, requireManager, flowController.getAllApprovals.bind(flowController));
 router.get('/pending', authenticateToken, requireManager, flowController.getPendingApprovals.bind(flowController));
 router.post('/:requestId/approve', authenticateToken, requireManager, flowController.approveExpense.bind(flowController));
 router.post('/:requestId/reject', authenticateToken, requireManager, flowController.rejectExpense.bind(flowController));

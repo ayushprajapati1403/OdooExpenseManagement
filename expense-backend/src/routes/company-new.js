@@ -5,6 +5,9 @@ import { requireAdmin } from '../middlewares/roles.js';
 import { validateApprovalFlow } from '../utils/validators.js';
 const router = express.Router();
 const companyController = new CompanyController();
+// Company Settings (Admin only)
+router.get('/settings', authenticateToken, companyController.getCompanySettings.bind(companyController));
+router.put('/settings', authenticateToken, requireAdmin, companyController.updateCompanySettings.bind(companyController));
 // Approval Flow Management (Admin only)
 router.post('/approval-flows', authenticateToken, requireAdmin, validateApprovalFlow, companyController.createApprovalFlow.bind(companyController));
 router.get('/approval-flows', authenticateToken, requireAdmin, companyController.getAllApprovalFlows.bind(companyController));

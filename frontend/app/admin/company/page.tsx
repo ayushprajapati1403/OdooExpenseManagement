@@ -73,6 +73,30 @@ function CompanySettingsPage() {
       const userProfile = await apiClient.getUserProfile();
       setUserRole(userProfile.role);
       
+      // Load company settings
+      try {
+        const settingsResponse = await apiClient.getCompanySettings();
+        const companyData = settingsResponse.company;
+        
+        setSettings({
+          id: companyData.id,
+          name: companyData.name,
+          currency: companyData.currency as Currency,
+          defaultApprovalFlow: companyData.defaultApprovalFlow || '',
+          website: companyData.website || '',
+          industry: companyData.industry || '',
+          size: companyData.size || '',
+          address: companyData.address || '',
+          country: companyData.country || '',
+          timezone: companyData.timezone || 'America/Los_Angeles',
+          fiscalYearStart: companyData.fiscalYearStart || '2024-01-01',
+          updatedAt: companyData.updatedAt,
+        });
+      } catch (error) {
+        console.warn('Failed to load company settings:', error);
+        // Keep default settings if loading fails
+      }
+      
       // Only load company statistics if user is admin
       if (userProfile.role === 'ADMIN') {
         try {
@@ -83,13 +107,6 @@ function CompanySettingsPage() {
           // Don't show error for non-admin users
         }
       }
-      
-      setSettings(prev => ({
-        ...prev,
-        id: userProfile.companyId || '',
-        // Note: Company name and other details not available in current backend
-        // These would need to be added to the Company model
-      }));
     } catch (error) {
       console.error('Failed to load company data:', error);
       toast({
@@ -112,16 +129,32 @@ function CompanySettingsPage() {
   ];
 
   const handleSave = async () => {
-    setIsSaving(true);
-
-    // Note: Company settings update not yet implemented in backend
-    setTimeout(() => {
-      setIsSaving(false);
+    if (userRole !== 'ADMIN') {
       toast({
-        title: 'Info',
-        description: 'Company settings update is not yet available. The backend needs additional company fields to be implemented.',
+        title: 'Access Denied',
+        description: 'Only administrators can update company settings',
+        variant: 'destructive',
       });
-    }, 1000);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await apiClient.updateCompanySettings(settings);
+      toast({
+        title: 'Success',
+        description: 'Company settings updated successfully',
+      });
+    } catch (error: any) {
+      console.error('Failed to save company settings:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save company settings',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleChange = (field: keyof CompanySettings, value: string) => {

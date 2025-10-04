@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { config } from './config';
+import { config } from './config/index.js';
 const app = express();
 // Middleware
 app.use(cors());

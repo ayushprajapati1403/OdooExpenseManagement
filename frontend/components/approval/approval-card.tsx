@@ -45,7 +45,23 @@ export function ApprovalCard({
   isProcessing,
 }: ApprovalCardProps) {
   const expense = approval.expense;
-  const status = statusConfig[approval.status];
+  
+  // Debug logging
+  console.log('🔍 ApprovalCard data:', {
+    approvalId: approval.id,
+    approvalStatus: approval.status,
+    expenseTitle: expense?.title,
+    expenseDescription: expense?.description,
+    expenseAmount: expense?.amount,
+    expenseCategory: expense?.category,
+    expenseDate: expense?.date,
+    userName: expense?.user?.name,
+    userEmail: expense?.user?.email
+  });
+  
+  // Ensure status exists in config, fallback to pending
+  const safeStatus = approval.status in statusConfig ? approval.status : 'pending';
+  const status = statusConfig[safeStatus];
   const StatusIcon = status.icon;
 
   const getInitials = (name: string) => {
@@ -71,7 +87,7 @@ export function ApprovalCard({
             <div className="flex items-start gap-3 flex-1">
               <Avatar className="h-10 w-10 border-2 border-primary/20">
                 <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                  {expense ? getInitials('User Name') : 'UN'}
+                  {expense?.user?.name ? getInitials(expense.user.name) : 'UN'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
@@ -80,7 +96,7 @@ export function ApprovalCard({
                 </h3>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <User className="h-3 w-3" />
-                  <span>John Doe</span>
+                  <span>{expense?.user?.name || 'Unknown User'}</span>
                 </div>
               </div>
             </div>

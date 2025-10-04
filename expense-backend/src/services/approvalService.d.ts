@@ -36,9 +36,9 @@ export declare class ApprovalService {
         message: string;
     }>;
     /**
-     * Get pending approvals for a specific approver
+     * Get all approvals for a specific approver (pending, approved, rejected)
      */
-    getPendingApprovals(approverId: string, page?: number, limit?: number): Promise<{
+    getAllApprovals(approverId: string, page?: number, limit?: number): Promise<{
         approvals: {
             id: string;
             comment: string | null;
@@ -48,6 +48,54 @@ export declare class ApprovalService {
             expenseId: string;
             approverId: string;
         }[];
+        pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            pages: number;
+        };
+    }>;
+    /**
+     * Get pending approvals for a specific approver
+     */
+    getPendingApprovals(approverId: string, page?: number, limit?: number): Promise<{
+        approvals: ({
+            expense: {
+                user: {
+                    email: string;
+                    name: string | null;
+                    id: string;
+                };
+                expenseLines: {
+                    id: string;
+                    amount: number;
+                    description: string;
+                    expenseId: string;
+                }[];
+            } & {
+                id: string;
+                companyId: string;
+                createdAt: Date;
+                currency: string;
+                userId: string;
+                amount: number;
+                category: string;
+                date: Date;
+                amountInCompanyCurrency: number | null;
+                description: string | null;
+                status: import("@prisma/client").$Enums.ExpenseStatus;
+                receiptImageUrl: string | null;
+                ocrData: import("@prisma/client/runtime/library").JsonValue | null;
+            };
+        } & {
+            id: string;
+            comment: string | null;
+            stepOrder: number;
+            status: import("@prisma/client").$Enums.RequestStatus;
+            decidedAt: Date | null;
+            expenseId: string;
+            approverId: string;
+        })[];
         pagination: {
             page: number;
             limit: number;
@@ -89,41 +137,8 @@ export declare class ApprovalService {
         pendingApprovals: number;
         approvedApprovals: number;
         rejectedApprovals: number;
-        monthlyBreakdown: (import("@prisma/client").Prisma.PickEnumerable<import("@prisma/client").Prisma.ApprovalRequestGroupByOutputType, import("@prisma/client").Prisma.ApprovalRequestScalarFieldEnum | import("@prisma/client").Prisma.ApprovalRequestScalarFieldEnum[]> & {
-            _count: true | {
-                id?: number | undefined;
-                expenseId?: number | undefined;
-                approverId?: number | undefined;
-                stepOrder?: number | undefined;
-                status?: number | undefined;
-                comment?: number | undefined;
-                decidedAt?: number | undefined;
-                _all?: number | undefined;
-            } | undefined;
-            _avg: {
-                stepOrder?: number | null | undefined;
-            } | undefined;
-            _sum: {
-                stepOrder?: number | null | undefined;
-            } | undefined;
-            _min: {
-                id?: string | null | undefined;
-                expenseId?: string | null | undefined;
-                approverId?: string | null | undefined;
-                stepOrder?: number | null | undefined;
-                status?: import("@prisma/client").$Enums.RequestStatus | null | undefined;
-                comment?: string | null | undefined;
-                decidedAt?: Date | null | undefined;
-            } | undefined;
-            _max: {
-                id?: string | null | undefined;
-                expenseId?: string | null | undefined;
-                approverId?: string | null | undefined;
-                stepOrder?: number | null | undefined;
-                status?: import("@prisma/client").$Enums.RequestStatus | null | undefined;
-                comment?: string | null | undefined;
-                decidedAt?: Date | null | undefined;
-            } | undefined;
+        monthlyBreakdown: (import("@prisma/client").Prisma.PickEnumerable<import("@prisma/client").Prisma.ApprovalRequestGroupByOutputType, "status"[]> & {
+            _count: number;
         })[];
     }>;
     /**
