@@ -1,8 +1,18 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
+import { CurrencyService } from '../services/currencyService.js';
+import { ApprovalService } from '../services/approvalService.js';
 
 export class ExpenseController {
+  private currencyService: CurrencyService;
+  private approvalService: ApprovalService;
+
+  constructor() {
+    this.currencyService = new CurrencyService();
+    this.approvalService = new ApprovalService();
+  }
+
   async createExpense(req: AuthenticatedRequest, res: Response) {
     try {
       const { amount, currency, category, description, date, expenseLines } = req.body;
@@ -21,10 +31,12 @@ export class ExpenseController {
       let amountInCompanyCurrency = null;
       if (currency !== user.company.currency) {
         try {
-          const conversionResponse = await fetch(`https://api.exchangerate-api.com/v4/latest/${currency}`);
-          const conversionData = await conversionResponse.json();
-          const rate = conversionData.rates[user.company.currency];
-          amountInCompanyCurrency = parseFloat(amount) * rate;
+          const conversion = await this.currencyService.convertCurrency(
+            parseFloat(amount),
+            currency,
+            user.company.currency
+          );
+          amountInCompanyCurrency = conversion.convertedAmount;
         } catch (error) {
           console.error('Currency conversion error:', error);
           // Continue without conversion
@@ -58,45 +70,23 @@ export class ExpenseController {
         });
       }
 
-      // Get approval flow for this expense
-      const approvalFlow = await prisma.approvalFlow.findFirst({
-        where: { companyId: user.companyId },
-        include: { steps: { orderBy: { stepOrder: 'asc' } } }
-      });
-
-      if (approvalFlow && approvalFlow.steps.length > 0) {
-        // Create approval requests
-        const approvalRequests = await Promise.all(
-          approvalFlow.steps.map(async (step) => {
-            let approverId = null;
-
-            if (step.role) {
-              // Find user with specific role
-              const approver = await prisma.user.findFirst({
-                where: {
-                  companyId: user.companyId,
-                  role: step.role
-                }
-              });
-              approverId = approver?.id;
-            } else if (step.specificUserId) {
-              approverId = step.specificUserId;
-            }
-
-            if (approverId) {
-              return prisma.approvalRequest.create({
-                data: {
-                  expenseId: expense.id,
-                  approverId,
-                  stepOrder: step.stepOrder
-                }
-              });
-            }
-          })
+      // Get approval flow for this expense and create approval requests
+      try {
+        const approvalRequests = await this.approvalService.createApprovalRequests(
+          expense.id,
+          user.companyId
         );
-
-        // Filter out null values
-        const validRequests = approvalRequests.filter(req => req !== null);
+        
+        if (approvalRequests.length === 0) {
+          // No approval flow configured, auto-approve
+          await prisma.expense.update({
+            where: { id: expense.id },
+            data: { status: 'APPROVED' }
+          });
+        }
+      } catch (error) {
+        console.error('Error creating approval requests:', error);
+        // Continue without approval workflow
       }
 
       res.status(201).json({

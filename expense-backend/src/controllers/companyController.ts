@@ -1,15 +1,8 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
-import { ApprovalService } from '../services/approvalService.js';
 
-export class FlowController {
-  private approvalService: ApprovalService;
-
-  constructor() {
-    this.approvalService = new ApprovalService();
-  }
-
+export class CompanyController {
   async createApprovalFlow(req: AuthenticatedRequest, res: Response) {
     try {
       const { name, ruleType, percentageThreshold, specificApproverId, steps } = req.body;
@@ -22,19 +15,37 @@ export class FlowController {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Create approval flow using service
-      const approvalFlow = await this.approvalService.createApprovalFlow(
-        currentUser.companyId,
-        name,
-        ruleType || 'UNANIMOUS',
-        steps,
-        percentageThreshold,
-        specificApproverId
+      // Create approval flow
+      const approvalFlow = await prisma.approvalFlow.create({
+        data: {
+          companyId: currentUser.companyId,
+          name,
+          ruleType: ruleType || 'UNANIMOUS',
+          percentageThreshold,
+          specificApproverId
+        }
+      });
+
+      // Create approval flow steps
+      const flowSteps = await Promise.all(
+        steps.map(async (step: any, index: number) => {
+          return prisma.approvalFlowStep.create({
+            data: {
+              flowId: approvalFlow.id,
+              stepOrder: index + 1,
+              role: step.role || null,
+              specificUserId: step.specificUserId || null
+            }
+          });
+        })
       );
 
       res.status(201).json({
         message: 'Approval flow created successfully',
-        approvalFlow
+        approvalFlow: {
+          ...approvalFlow,
+          steps: flowSteps
+        }
       });
     } catch (error) {
       console.error('Create approval flow error:', error);
@@ -56,10 +67,7 @@ export class FlowController {
         where: { companyId: currentUser.companyId },
         include: {
           steps: {
-            orderBy: { stepOrder: 'asc' },
-            include: {
-              flow: false
-            }
+            orderBy: { stepOrder: 'asc' }
           }
         },
         orderBy: { createdAt: 'desc' }
@@ -219,132 +227,7 @@ export class FlowController {
     }
   }
 
-  async getPendingApprovals(req: AuthenticatedRequest, res: Response) {
-    try {
-      const { page = 1, limit = 10 } = req.query;
-
-      const result = await this.approvalService.getPendingApprovals(
-        req.user!.userId,
-        parseInt(page as string),
-        parseInt(limit as string)
-      );
-
-      res.json(result);
-    } catch (error) {
-      console.error('Get pending approvals error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  }
-
-  async approveExpense(req: AuthenticatedRequest, res: Response) {
-    try {
-      const { requestId } = req.params;
-      const { comment } = req.body;
-
-      // Check if user can approve this request
-      const canApprove = await this.approvalService.canUserApprove(req.user!.userId, requestId);
-      if (!canApprove) {
-        return res.status(403).json({ error: 'Not authorized to approve this request' });
-      }
-
-      // Process approval using service
-      const result = await this.approvalService.processApprovalDecision(
-        requestId,
-        'APPROVED',
-        comment
-      );
-
-      res.json({ message: result.message });
-    } catch (error) {
-      console.error('Approve expense error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  }
-
-  async rejectExpense(req: AuthenticatedRequest, res: Response) {
-    try {
-      const { requestId } = req.params;
-      const { comment } = req.body;
-
-      // Check if user can approve this request
-      const canApprove = await this.approvalService.canUserApprove(req.user!.userId, requestId);
-      if (!canApprove) {
-        return res.status(403).json({ error: 'Not authorized to reject this request' });
-      }
-
-      // Process rejection using service
-      const result = await this.approvalService.processApprovalDecision(
-        requestId,
-        'REJECTED',
-        comment
-      );
-
-      res.json({ message: result.message });
-    } catch (error) {
-      console.error('Reject expense error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  }
-
-  async getApprovalHistory(req: AuthenticatedRequest, res: Response) {
-    try {
-      const { expenseId } = req.params;
-
-      const expense = await prisma.expense.findUnique({
-        where: { id: expenseId }
-      });
-
-      if (!expense) {
-        return res.status(404).json({ error: 'Expense not found' });
-      }
-
-      // Check if user can view this expense
-      const currentUser = await prisma.user.findUnique({
-        where: { id: req.user!.userId }
-      });
-
-      if (!currentUser) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      // User can view their own expenses or if they're admin/manager
-      if (expense.userId !== req.user!.userId && 
-          currentUser.role !== 'ADMIN' && 
-          currentUser.role !== 'MANAGER') {
-        return res.status(403).json({ error: 'Access denied' });
-      }
-
-      const approvalHistory = await this.approvalService.getApprovalHistory(expenseId);
-      res.json({ approvalHistory });
-    } catch (error) {
-      console.error('Get approval history error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  }
-
-  async overrideApproval(req: AuthenticatedRequest, res: Response) {
-    try {
-      const { requestId } = req.params;
-      const { action, comment } = req.body; // action: 'approve' or 'reject'
-
-      if (!action || !['approve', 'reject'].includes(action)) {
-        return res.status(400).json({ error: 'Action must be approve or reject' });
-      }
-
-      const result = await this.approvalService.adminOverride(
-        requestId,
-        action.toUpperCase() as 'APPROVED' | 'REJECTED',
-        comment
-      );
-
-      res.json({ message: result.message });
-    } catch (error) {
-      console.error('Override approval error:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  }
-
-  async getCompanyApprovals(req: AuthenticatedRequest, res: Response) {
+  async getCompanyStatistics(req: AuthenticatedRequest, res: Response) {
     try {
       const currentUser = await prisma.user.findUnique({
         where: { id: req.user!.userId }
@@ -354,24 +237,102 @@ export class FlowController {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      const { status, page = 1, limit = 10 } = req.query;
+      const [
+        totalUsers,
+        totalExpenses,
+        pendingExpenses,
+        approvedExpenses,
+        rejectedExpenses,
+        totalAmount,
+        monthlyExpenses
+      ] = await Promise.all([
+        prisma.user.count({
+          where: { companyId: currentUser.companyId }
+        }),
+        prisma.expense.count({
+          where: { companyId: currentUser.companyId }
+        }),
+        prisma.expense.count({
+          where: { 
+            companyId: currentUser.companyId,
+            status: 'PENDING'
+          }
+        }),
+        prisma.expense.count({
+          where: { 
+            companyId: currentUser.companyId,
+            status: 'APPROVED'
+          }
+        }),
+        prisma.expense.count({
+          where: { 
+            companyId: currentUser.companyId,
+            status: 'REJECTED'
+          }
+        }),
+        prisma.expense.aggregate({
+          where: { 
+            companyId: currentUser.companyId,
+            status: 'APPROVED'
+          },
+          _sum: {
+            amountInCompanyCurrency: true
+          }
+        }),
+        prisma.expense.groupBy({
+          by: ['status'],
+          where: {
+            companyId: currentUser.companyId,
+            createdAt: {
+              gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+            }
+          },
+          _count: true,
+          _sum: {
+            amountInCompanyCurrency: true
+          }
+        })
+      ]);
 
-      const whereClause: any = {
-        expense: {
-          companyId: currentUser.companyId
+      res.json({
+        statistics: {
+          totalUsers,
+          totalExpenses,
+          pendingExpenses,
+          approvedExpenses,
+          rejectedExpenses,
+          totalApprovedAmount: totalAmount._sum.amountInCompanyCurrency || 0,
+          monthlyBreakdown: monthlyExpenses
         }
-      };
+      });
+    } catch (error) {
+      console.error('Get company statistics error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
 
-      if (status) {
-        whereClause.status = status;
+  async getCompanyUsers(req: AuthenticatedRequest, res: Response) {
+    try {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: req.user!.userId }
+      });
+
+      if (!currentUser) {
+        return res.status(404).json({ error: 'User not found' });
       }
 
-      const approvals = await prisma.approvalRequest.findMany({
-        where: whereClause,
-        include: {
-          expense: {
+      const users = await prisma.user.findMany({
+        where: { companyId: currentUser.companyId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isManagerApprover: true,
+          createdAt: true,
+          employeeRelation: {
             include: {
-              user: {
+              manager: {
                 select: {
                   id: true,
                   name: true,
@@ -380,35 +341,24 @@ export class FlowController {
               }
             }
           },
-          approver: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              role: true
+          managedEmployees: {
+            include: {
+              employee: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              }
             }
           }
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (parseInt(page as string) - 1) * parseInt(limit as string),
-        take: parseInt(limit as string)
+        orderBy: { createdAt: 'desc' }
       });
 
-      const total = await prisma.approvalRequest.count({
-        where: whereClause
-      });
-
-      res.json({
-        approvals,
-        pagination: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
-          total,
-          pages: Math.ceil(total / parseInt(limit as string))
-        }
-      });
+      res.json({ users });
     } catch (error) {
-      console.error('Get company approvals error:', error);
+      console.error('Get company users error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

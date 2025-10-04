@@ -7,12 +7,16 @@ import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import expenseRoutes from './routes/expenses.js';
 import flowRoutes from './routes/flows.js';
+import companyRoutes from './routes/company-new.js';
+import ocrRoutes from './routes/ocr-new.js';
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/flows', flowRoutes);
+app.use('/api/company', companyRoutes);
+app.use('/api/ocr', ocrRoutes);
 
 const PORT = config.port;
 
