@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import prisma from '../prisma';
-import { config } from '../config';
-import { AuthenticatedRequest } from '../middlewares/auth';
+import prisma from '../prisma.js';
+import { config } from '../config/index.js';
+import { AuthenticatedRequest } from '../middlewares/auth.js';
 
 export class AuthController {
   async signup(req: Request, res: Response) {

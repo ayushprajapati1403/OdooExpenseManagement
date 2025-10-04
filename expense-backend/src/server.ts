@@ -1,12 +1,14 @@
-import app from './app';
-import { config } from './config';
-import prisma from './prisma';
+import app from './app.js';
+import { config } from './config/index.js';
+import prisma from './prisma.js';
 
 // Import routes
-import authRoutes from './routes/auth';
+import authRoutes from './routes/auth.js';
+import userRoutes from './routes/users.js';
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 
 const PORT = config.port;
 
