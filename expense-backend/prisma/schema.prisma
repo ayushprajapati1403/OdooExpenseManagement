@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id        String         @id @default(uuid())
+  name      String
+  currency  String
+  country   String
+  createdAt DateTime       @default(now())
+  flows     ApprovalFlow[]
+  expenses  Expense[]
+  users     User[]
+}
+
+model User {
+  id                String            @id @default(uuid())
+  email             String            @unique
+  password          String
+  name              String?
+  role              Role              @default(EMPLOYEE)
+  companyId         String
+  isManagerApprover Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  approvals         ApprovalRequest[]
+  expenses          Expense[]
+  employeeRelation  ManagerRelation?  @relation("EmployeeToManager")
+  managedEmployees  ManagerRelation[] @relation("ManagerToEmployee")
+  company           Company           @relation(fields: [companyId], references: [id])
+}
+
+model ManagerRelation {
+  id         String @id @default(uuid())
+  employeeId String @unique
+  managerId  String
+  employee   User   @relation("EmployeeToManager", fields: [employeeId], references: [id])
+  manager    User   @relation("ManagerToEmployee", fields: [managerId], references: [id])
+}
+
+model Expense {
+  id                      String            @id @default(uuid())
+  companyId               String
+  userId                  String
+  amount                  Decimal           @db.Decimal(18, 2)
+  currency                String
+  amountInCompanyCurrency Decimal?          @db.Decimal(18, 2)
+  category                String
+  description             String?
+  date                    DateTime
+  status                  ExpenseStatus     @default(PENDING)
+  receiptImageUrl         String?
+  ocrData                 Json?
+  createdAt               DateTime          @default(now())
+  approvalRequests        ApprovalRequest[]
+  company                 Company           @relation(fields: [companyId], references: [id])
+  user                    User              @relation(fields: [userId], references: [id])
+  expenseLines            ExpenseLine[]
+}
+
+model ApprovalFlow {
+  id                  String             @id @default(uuid())
+  companyId           String
+  name                String
+  ruleType            ApprovalRuleType   @default(UNANIMOUS)
+  percentageThreshold Int?
+  specificApproverId  String?
+  company             Company            @relation(fields: [companyId], references: [id])
+  steps               ApprovalFlowStep[]
+}
+
+model ApprovalFlowStep {
+  id             String       @id @default(uuid())
+  flowId         String
+  stepOrder      Int
+  role           Role?
+  specificUserId String?
+  flow           ApprovalFlow @relation(fields: [flowId], references: [id])
+}
+
+model ExpenseLine {
+  id          String  @id @default(uuid())
+  expenseId   String
+  amount      Decimal @db.Decimal(18, 2)
+  description String
+  expense     Expense @relation(fields: [expenseId], references: [id])
+}
+
+model ApprovalRequest {
+  id         String        @id @default(uuid())
+  expenseId  String
+  approverId String
+  stepOrder  Int
+  status     RequestStatus @default(PENDING)
+  comment    String?
+  decidedAt  DateTime?
+  approver   User          @relation(fields: [approverId], references: [id])
+  expense    Expense       @relation(fields: [expenseId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  FINANCE
+  DIRECTOR
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApprovalRuleType {
+  PERCENTAGE
+  SPECIFIC
+  HYBRID
+  UNANIMOUS
+}
